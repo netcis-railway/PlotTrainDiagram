@@ -1,0 +1,6 @@
+=== AGV Scheduling Log Started at 2026-03-15 15:52:18.141755 ===
+Input case: terminal_print
+Algorithm: 
+CPU cores/threads used: 1
+Log file: ./data/S2_30tra_23sta_t4_M_new/log_terminal_print__20260315_155218.txt
+============================================================

@@ -1,0 +1,2 @@
+date_time,test,workingdir,input_file_timetable,total_stations,total_trains,input_file_disruption,solver,solver_time,solver_odjs,modeling_time,solver_output_logfile,terminal_output_logfile,Constraints,Variables
+2026-06-22_21:55:15,S1_t7,/home/dell/Release_development/jh/jh_s1/,plan_TT0.xlsx,23,60,./data/plan_TT0.xlsx,GUROBI,11.04,11979.0,33.17,./data/S1_t7/gurobi_2026-06-22_21:55:15.log,./data/S1_t7/log_terminal_print__20260622_215515.txt,857640,83341

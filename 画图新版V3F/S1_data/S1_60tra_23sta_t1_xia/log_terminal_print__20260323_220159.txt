@@ -1,0 +1,10 @@
+=== AGV Scheduling Log Started at 2026-03-23 22:01:59.681627 ===
+Input case: terminal_print
+Algorithm: 
+CPU cores/threads used: 1
+Log file: ./data/S1_60tra_23sta_t1_xia/log_terminal_print__20260323_220159.txt
+============================================================
+开始求解
+Received other exception.
+ - Reason        : Warning: solution is not available
+求解日期：2026-03-23_22:01:59

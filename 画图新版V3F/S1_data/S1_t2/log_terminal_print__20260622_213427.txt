@@ -1,0 +1,7 @@
+=== AGV Scheduling Log Started at 2026-06-22 21:34:27.480138 ===
+Input case: terminal_print
+Algorithm: 
+CPU cores/threads used: 1
+Log file: ./data/S1_t2/log_terminal_print__20260622_213427.txt
+============================================================
+开始求解

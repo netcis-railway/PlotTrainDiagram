@@ -1,0 +1,3 @@
+date_time,test,workingdir,input_file_timetable,total_stations,total_trains,input_file_disruption,solver,solver_time,solver_odjs,modeling_time,solver_output_logfile,terminal_output_logfile,Constraints,Variables
+2026-01-27_22:53:53,S1_60tra_23sta_t8_new,/home/dell/MAPLPY/jh_s1/,plan.xlsx,23,60,./data/plan.xlsx,GUROBI,20.97,15407.0,34.56,./data/S1_60tra_23sta_t8_new/gurobi_2026-01-27_22:53:53.log,./data/S1_60tra_23sta_t8_new/log_terminal_print__20260127_225353.txt,857640,83341
+2026-02-06_14:41:41,S1_60tra_23sta_t8_new,/home/dell/Release/jh_s1/,plan.xlsx,23,60,./data/plan.xlsx,GUROBI,26.46,15407.0,39.45,./data/S1_60tra_23sta_t8_new/gurobi_2026-02-06_14:41:41.log,./data/S1_60tra_23sta_t8_new/log_terminal_print__20260206_144141.txt,857640,83341

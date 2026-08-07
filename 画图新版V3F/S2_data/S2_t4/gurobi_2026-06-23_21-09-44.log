@@ -1,0 +1,59 @@
+
+Gurobi 12.0.1 (linux64) logging started Tue Jun 23 21:09:53 2026
+
+Set parameter LogFile to value "./data/S2_t4/gurobi_2026-06-23_21-09-44.log"
+Set parameter OutputFlag to value 1
+Set parameter InfUnbdInfo to value 1
+Gurobi Optimizer version 12.0.1 build v12.0.1rc0 (linux64 - "Ubuntu 24.04.2 LTS")
+
+CPU model: Intel(R) Xeon(R) Silver 4208 CPU @ 2.10GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Non-default parameters:
+InfUnbdInfo  1
+LogToConsole  0
+
+Optimize a model with 249150 rows, 21871 columns and 1030380 nonzeros
+Model fingerprint: 0x6ba3c4d7
+Variable types: 2071 continuous, 19800 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+06]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 3e+07]
+  RHS range        [1e+00, 4e+06]
+Presolve removed 221875 rows and 17322 columns
+Presolve time: 0.41s
+Presolved: 27275 rows, 4549 columns, 81040 nonzeros
+Variable types: 807 continuous, 3742 integer (3742 binary)
+Performing another presolve...
+Presolve removed 9265 rows and 270 columns
+Presolve time: 0.24s
+
+Root relaxation: objective 2.390800e+04, 1823 iterations, 0.02 seconds (0.01 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 23908.0000    0   13          - 23908.0000      -     -    1s
+H    0     0                    40331.000000 23908.0000  40.7%     -    1s
+H    0     0                    26742.000000 23908.0000  10.6%     -    1s
+     0     0 24235.0000    0   11 26742.0000 24235.0000  9.37%     -    1s
+     0     0 24235.0000    0   11 26742.0000 24235.0000  9.37%     -    1s
+     0     0 26181.6092    0    6 26742.0000 26181.6092  2.10%     -    1s
+     0     0 26330.7610    0    6 26742.0000 26330.7610  1.54%     -    1s
+     0     0 26345.9308    0    5 26742.0000 26345.9308  1.48%     -    1s
+
+Cutting planes:
+  Gomory: 1
+  Implied bound: 37
+  MIR: 8
+  RLT: 1
+  Relax-and-lift: 5
+
+Explored 1 nodes (2003 simplex iterations) in 1.69 seconds (1.05 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 3: 26742 39901 40331 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.674200000000e+04, best bound 2.674200000000e+04, gap 0.0000%

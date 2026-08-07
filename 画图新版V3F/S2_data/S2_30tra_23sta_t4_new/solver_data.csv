@@ -1,0 +1,2 @@
+date_time,test,workingdir,input_file_timetable,total_stations,total_trains,input_file_disruption,solver,solver_time,solver_odjs,modeling_time,solver_output_logfile,terminal_output_logfile,Constraints,Variables
+2026-01-28_08-47-32,S2_30tra_23sta_t4_new,/home/dell/MAPLPY/jh_s2/,plan.xlsx,23,30,./data/plan.xlsx,GUROBI,4.94,4664.0,8.94,./data/S2_30tra_23sta_t4_new/gurobi_2026-01-28_08-47-32.log,./data/S2_30tra_23sta_t4_new/log_terminal_print__20260128_084732.txt,249150,21871

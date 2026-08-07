@@ -1,0 +1,29 @@
+=== AGV Scheduling Log Started at 2026-06-23 21:08:30.479879 ===
+Input case: terminal_print
+Algorithm: 
+CPU cores/threads used: 1
+Log file: ./data/S2_t3/log_terminal_print__20260623_210830.txt
+============================================================
+建模耗时: 9.14 秒
+求解耗时: 2.40 秒
+0
+未在日志文件中找到数量（列车/站点）
+成功提取 Optimize rows=249150, columns=21871
+结果已保存为 train_stop_result.csv
+结果已保存为 time_arrive_result.csv
+结果已保存为 time_departure_result.csv
+求解日期：2026-06-23_21-08-30
+求解目标值：30054.0
+工作目录：/home/dell/Release_development/jh/jh_s2/
+案例目录：S2_t3
+输入文件路径：./data/plan_TT0.xlsx
+输入时刻表：plan_TT0.xlsx
+总车站数： 23
+总车辆数： 30
+求解器名称：GUROBI
+建模耗时: 9.14 秒
+求解耗时: 2.40 秒
+求解器日志输出路径：./data/S2_t3/gurobi_2026-06-23_21-08-30.log
+============================================================
+=== AGV Scheduling Log Ended (TEST_COMPLETED) at 2026-06-23 21:08:42.070748 ===
+Log saved to: ./data/S2_t3/log_terminal_print__20260623_210830.txt

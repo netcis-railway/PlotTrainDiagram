@@ -1,0 +1,60 @@
+
+Gurobi 12.0.1 (linux64) logging started Tue Mar 17 14:08:08 2026
+
+Set parameter LogFile to value "./data/S2_30tra_23sta_t1_M_new/gurobi_2026-03-17_14-07-48.log"
+Set parameter OutputFlag to value 1
+Set parameter InfUnbdInfo to value 1
+Gurobi Optimizer version 12.0.1 build v12.0.1rc0 (linux64 - "Ubuntu 24.04.2 LTS")
+
+CPU model: Intel(R) Xeon(R) Silver 4208 CPU @ 2.10GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Non-default parameters:
+InfUnbdInfo  1
+LogToConsole  0
+
+Optimize a model with 249150 rows, 21871 columns and 1030380 nonzeros
+Model fingerprint: 0x9468281e
+Variable types: 2071 continuous, 19800 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+06]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 3e+07]
+  RHS range        [1e+00, 4e+06]
+Presolve removed 221875 rows and 17322 columns
+Presolve time: 0.52s
+Presolved: 27275 rows, 4549 columns, 81040 nonzeros
+Variable types: 807 continuous, 3742 integer (3742 binary)
+Performing another presolve...
+Presolve removed 9260 rows and 270 columns
+Presolve time: 0.27s
+
+Root relaxation: objective 2.343400e+04, 1819 iterations, 0.02 seconds (0.01 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 23434.0000    0   10          - 23434.0000      -     -    1s
+H    0     0                    40969.000000 23434.0000  42.8%     -    1s
+H    0     0                    25503.000000 23434.0000  8.11%     -    1s
+H    0     0                    25323.000000 23434.0000  7.46%     -    1s
+     0     0 23674.0000    0    8 25323.0000 23674.0000  6.51%     -    2s
+     0     0 24149.0000    0    7 25323.0000 24149.0000  4.64%     -    2s
+     0     0 24399.1777    0    8 25323.0000 24399.1777  3.65%     -    2s
+     0     0 24399.1777    0    7 25323.0000 24399.1777  3.65%     -    2s
+     0     0 25109.1309    0    4 25323.0000 25109.1309  0.84%     -    2s
+     0     0 25222.2794    0    1 25323.0000 25222.2794  0.40%     -    2s
+
+Cutting planes:
+  Learned: 3
+  Implied bound: 19
+  MIR: 1
+  Relax-and-lift: 6
+
+Explored 1 nodes (1941 simplex iterations) in 2.13 seconds (1.03 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 4: 25323 25503 37109.1 40969 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.532300000000e+04, best bound 2.532300000000e+04, gap 0.0000%

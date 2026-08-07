@@ -1,0 +1,26 @@
+=== AGV Scheduling Log Started at 2026-02-07 18:22:07.702539 ===
+Input case: terminal_print
+Algorithm: 
+CPU cores/threads used: 1
+Log file: ./data/S1_60tra_23sta_t8_M_new/log_terminal_print__20260207_182207.txt
+============================================================
+开始求解
+成功提取最佳目标值: 10010.0
+成功提取 rows=857640, columns=83340
+结果已保存为 time_arrive_result.csv
+结果已保存为 time_departure_result.csv
+求解日期：2026-02-07_18:22:07
+求解目标值：10010.0
+工作目录：/home/dell/Release/jh/jh_s1/
+案例目录：S1_60tra_23sta_t8_M_new
+输入文件路径：./data/plan_TT0.xlsx
+输入时刻表：plan_TT0.xlsx
+总车站数： 23
+总车辆数： 60
+求解器名称：MINDOPT
+建模耗时: 33.87 秒
+求解耗时: 72.19 秒
+求解器日志输出路径：/home/dell/Release/jh/jh_s1/data/S1_60tra_23sta_t8_M_new/mindopt_2026-02-07_18:22:07.log
+============================================================
+=== AGV Scheduling Log Ended (TEST_COMPLETED) at 2026-02-07 18:23:53.841039 ===
+Log saved to: ./data/S1_60tra_23sta_t8_M_new/log_terminal_print__20260207_182207.txt

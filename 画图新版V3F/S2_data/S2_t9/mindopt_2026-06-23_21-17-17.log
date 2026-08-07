@@ -1,0 +1,59 @@
+Model summary.
+ - Num. variables     : 21870
+ - Num. constraints   : 249150
+ - Num. nonzeros      : 1030380
+ - Num. integer vars. : 20490
+ - Num. free vars.    : 0
+ - Num. ranged vars.  : 21870
+ - Num. eq. cons.     : 19140
+ - Bound range        : [1.0e+00,4.0e+06]
+ - Objective range    : [1.0e+00,1.0e+00]
+
+Branch-and-cut method started.
+Original model: rows = 249150 columns = 21870 nonzeros = 1030380
+Tolerance: primal = 1e-06 int = 1e-06 mipgap = 0.0001 mipgapAbs = 1e-06
+Limit: time = 1.79769313486232e+308 node = -1 stalling = -1 solution = -1
+presolver terminated; took 182 ms
+presolver terminated; took 927 ms
+Parallelism: root=8, tree=16
+Model summary.
+ - Num. variables     : 4279
+ - Num. constraints   : 20755
+ - Num. nonzeros      : 61750
+ - Num. free vars.    : 0
+ - Num. ranged vars.  : 4279
+ - Num. eq. cons.     : 0
+ - Bound range        : [1.0e+00,1.0e+06]
+ - Objective range    : [1.0e+00,2.0e+00]
+ - Matrix range       : [1.0e+00,9.8e+05]
+
+Presolver started.
+Presolver terminated. Time : 0.087s
+
+Simplex method started.
+Model fingerprint: md3YuJWYhdnbgJmYldHYgV2Y
+
+    Iteration       Objective       Dual Inf.     Primal Inf.     Time
+            0     2.40994e+15      2.4099e+02      1.5090e+12     0.11s    
+         4426     3.00250e+07      0.0000e+00      0.0000e+00     0.53s    
+Postsolver started.
+Simplex method terminated. Time : 0.451s
+
+Root relaxation: 7238 iteration = 4426 time = 0.55
+
+Evaluated  InQueue     DualBound     Incumbent      Gap      Time
+        0        0  7.238000e+03  4.643937e+06   99.84%        1s
+        0        0  7.238000e+03  8.740000e+03   17.19%        8s
+        0        0  7.238000e+03  8.740000e+03   17.19%       10s
+        0        0  8.360111e+03  8.740000e+03    4.35%       43s
+Branch-and-cut method terminated. Time : 52.530s
+
+Optimizer summary.
+ - Optimizer used     : Branch-and-cut method
+ - Optimizer status   : OPTIMAL
+ - Total time         : 52.547s
+
+Solution summary.
+ - Primal objective   : 8.7399999991e+03 
+ - Dual bound         : 8.7391259991e+03 
+ - Relative gap       : 0.0100%

@@ -1,0 +1,3 @@
+date_time,test,workingdir,input_file_timetable,total_stations,total_trains,input_file_disruption,solver,solver_time,solver_odjs,modeling_time,solver_output_logfile,terminal_output_logfile,Constraints,Variables
+2026-06-23_21-12-22,S2_t6,/home/dell/Release_development/jh/jh_s2/,plan_TT0.xlsx,23,30,./data/plan_TT0.xlsx,GUROBI,4.1,96747.0,9.05,./data/S2_t6/gurobi_2026-06-23_21-12-22.log,./data/S2_t6/log_terminal_print__20260623_211222.txt,249150,21871
+2026-06-23_21-12-37,S2_t6,/home/dell/Release_development/jh/jh_s2/,plan_TT0.xlsx,23,30,./data/plan_TT0.xlsx,MINDOPT,38.52,96747.0,9.21,/home/dell/Release_development/jh/jh_s2/data/S2_t6/mindopt_2026-06-23_21-12-37.log,./data/S2_t6/log_terminal_print__20260623_211237.txt,249150,21870

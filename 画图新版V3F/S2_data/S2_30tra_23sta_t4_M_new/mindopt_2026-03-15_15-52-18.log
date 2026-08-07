@@ -1,0 +1,59 @@
+Model summary.
+ - Num. variables     : 21870
+ - Num. constraints   : 249150
+ - Num. nonzeros      : 1030380
+ - Num. integer vars. : 20490
+ - Num. free vars.    : 0
+ - Num. ranged vars.  : 21870
+ - Num. eq. cons.     : 19140
+ - Bound range        : [1.0e+00,4.0e+06]
+ - Objective range    : [1.0e+00,1.0e+00]
+
+Branch-and-cut method started.
+Original model: rows = 249150 columns = 21870 nonzeros = 1030380
+Tolerance: primal = 1e-06 int = 1e-06 mipgap = 0.0001 mipgapAbs = 1e-06
+Limit: time = 1.79769313486232e+308 node = -1 stalling = -1 solution = -1
+presolver terminated; took 329 ms
+presolver terminated; took 1263 ms
+Parallelism: root=8, tree=16
+Model summary.
+ - Num. variables     : 4279
+ - Num. constraints   : 20762
+ - Num. nonzeros      : 61771
+ - Num. free vars.    : 0
+ - Num. ranged vars.  : 4279
+ - Num. eq. cons.     : 0
+ - Bound range        : [1.0e+00,1.0e+06]
+ - Objective range    : [1.0e+00,2.0e+00]
+ - Matrix range       : [1.0e+00,9.8e+05]
+
+Presolver started.
+Presolver terminated. Time : 0.141s
+
+Simplex method started.
+Model fingerprint: md3bnFWYhdnYvJmYldnbgV2Y
+
+    Iteration       Objective       Dual Inf.     Primal Inf.     Time
+            0     2.06893e+15      2.0689e+02      1.4452e+12     0.18s    
+         3178     3.15095e+07      0.0000e+00      4.6409e+03     0.68s    
+         4787     3.00917e+07      2.1034e-04      0.0000e+00     0.93s    
+         4787     3.00917e+07      2.1034e-04      0.0000e+00     0.93s    
+         4788     3.00917e+07      0.0000e+00      0.0000e+00     0.93s    
+Postsolver started.
+Simplex method terminated. Time : 0.799s
+
+Root relaxation: 73989 iteration = 4788 time = 0.952
+
+Evaluated  InQueue     DualBound     Incumbent      Gap      Time
+        0        0  7.398900e+04  4.783594e+06   98.45%        2s
+        0        0  7.398900e+04  4.549263e+06   98.37%        4s
+        0        0  7.398900e+04  4.485632e+06   98.35%        4s
+        0        0  7.398900e+04  1.093220e+05   32.32%       10s
+        0        0  7.398900e+04  9.472400e+04   21.89%       14s
+        0        0  7.398900e+04  9.420500e+04   21.46%       17s
+        0        0  7.398900e+04  9.331900e+04   20.71%       19s
+        0        0  7.398900e+04  9.175600e+04   19.36%       23s
+        0        0  7.398900e+04  9.175600e+04   19.36%       33s
+        0        0  8.998013e+04  9.175600e+04    1.94%       87s
+        0        0  8.998013e+04  9.159300e+04    1.76%       88s
+        0        0  8.998013e+04  9.104200e+04    1.17%       91s

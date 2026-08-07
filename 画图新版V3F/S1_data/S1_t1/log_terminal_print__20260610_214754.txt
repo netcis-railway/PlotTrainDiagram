@@ -1,0 +1,10 @@
+=== AGV Scheduling Log Started at 2026-06-10 21:47:54.554993 ===
+Input case: terminal_print
+Algorithm: 
+CPU cores/threads used: 1
+Log file: ./data/S1_t1/log_terminal_print__20260610_214754.txt
+============================================================
+开始求解
+Received other exception.
+ - Reason        : Warning: some error occurred when running solver
+求解日期：2026-06-10_21:47:54

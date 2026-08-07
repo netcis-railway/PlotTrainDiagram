@@ -30,6 +30,9 @@ function DrawTrainDigram = DrawTrainDigramFunctionV3f
     
     %标记所有列车车次编号
     DrawTrainDigram.MarkTrainNumber = @MarkTrainNumber;
+
+    %根据基本图和调度图绘制对比运行图
+    DrawTrainDigram.DrawLineDigramBasevsRescheduled = @DrawLineDigramBasevsRescheduled;
 end
 
 %% 函数名称：ReadTrainSchedule
@@ -209,12 +212,17 @@ function [ StationPosition ] = DrawBackground(RAW, startHour, endHour, stationNu
     % 找出属于该线路的车站
     % 使画图时只画出指定线路号经过的车站作为y轴
     validStations = [];
-    for i = 1:stationNum
-        % 第一行为表头，第二行开始的第四列为LineInfo
-        LineInfo = RAW{i+1,4};
-        % 若此站在指定的线路号上，加入validStations中
-        if IsStationOnLine(LineInfo,LineID)
-            validStations(end+1) = i;
+    % 若 LineID 为空，使用全部车站（不筛选线路）
+    if isempty(LineID) || (ischar(LineID) && strlength(LineID)==0)
+        validStations = 1:stationNum;
+    else
+        for i = 1:stationNum
+            % 第一行为表头，第二行开始的第四列为LineInfo
+            LineInfo = RAW{i+1,4};
+            % 若此站在指定的线路号上，加入validStations中
+            if IsStationOnLine(LineInfo,LineID)
+                validStations(end+1) = i;
+            end
         end
     end
     % 计算真正需要画在图中的车站数量
@@ -392,12 +400,16 @@ function [ ] = DrawLineDigram(RAW, trainNum, stationNum, DirectionSign, StationP
     % 存放有效车站
     validStations = [];
 
-    % 判断车站是否属于指定线路
-    for j = 1:stationNum
-        % 第一行为表头，第二行开始的第四列信息为LineInfo
-        LineInfo = RAW{j+1,4};
-        if IsStationOnLine(LineInfo,LineID)
-            validStations(end+1) = j;
+    % 判断车站是否属于指定线路（LineID 为空时使用全部车站）
+    if isempty(LineID) || (ischar(LineID) && strlength(LineID)==0)
+        validStations = 1:stationNum;
+    else
+        for j = 1:stationNum
+            % 第一行为表头，第二行开始的第四列信息为LineInfo
+            LineInfo = RAW{j+1,4};
+            if IsStationOnLine(LineInfo,LineID)
+                validStations(end+1) = j;
+            end
         end
     end
 
@@ -502,40 +514,50 @@ end
 
 %% 函数名称：DrawLineDigramBasevsRescheduled
 %  开发者： 李仁龙
-%  描    述：根据时刻表的数据与指定的线路号，两次调用DrawLineDigram（）函数
-%           需要指定绘图颜色，先用黑色绘制基本运行图，再用红色绘制调度后的运行图
-%  输入参数：trainNum列车数量, stationNum站台数量, RAW全部内容的元胞变量, DirectionSign上下行标识, 
-%             StationPosition每个站点在y轴的坐标, LineID为指定的线路号
-%  输出参数：无
-%  调用函数：parseTime()时间转换函数、IsStationOnLine()判断某站是否在指定线路上
-% function [ ] = DrawLineDigramBasevsRescheduled(RAW, trainNum, stationNum, DirectionSign, StationPosition, LineID)
-function [ ] = DrawLineDigramBasevsRescheduled(TTFilev3f, sheetName, LineID)
-    
+%  描    述：根据基本计划时刻表和调度计划时刻表（均为 v3f 格式 RAW 数据），
+%           在同一张图上对比绘制运行图 —— 基本图黑色，调度图红/蓝（下行红，上行蓝）
+%  输入参数：RAW_base, trainNum_base — 基本计划时刻表 v3f 数据
+%            RAW_res,  trainNum_res  — 调度计划时刻表 v3f 数据
+%            stationNum             — 车站数量
+%            LineID                 — 指定线路号（默认=1，'' 表示全线）
+%  输出参数：StationPosition        — 站点 Y 轴坐标
+%  调用函数：GetTrainTimeSegment, JudgeUpOrDown,
+%            GetStationInterval, DrawBackground, DrawLineDigram, MarkTrainNumber
+function [StationPosition] = DrawLineDigramBasevsRescheduled(RAW_base, trainNum_base, ...
+                                                              RAW_res, trainNum_res, ...
+                                                              stationNum, LineID)
 
-    % TODO: 参考脚本文件DrawV3f.m 的流程，实现基本图和调度计划图对比作图
-
-    % 读取以Excel形式存储的列车时刻表，时刻表的标准遵循版本V3f
-    [RAW, NUM, trainNum, stationNum] = DrawTrainDigram.ReadTrainSchedule(TTFilev3f, sheetName);
-    % 设置基本信息，LineID为指定线路号，color为画图指定颜色
-    if nargin < 3 || isempty(LineID)
-            LineID = 1;     % 默认单线：1   多线：'1,2'
+    % 设置默认线路号（仅未传入时默认=1；空字符串''表示全线不筛选，保留原值）
+    if nargin < 6
+        LineID = 1;
     end
 
+    % ============ (1) 获取合并时间范围 ============
+    [startHour_base, endHour_base] = GetTrainTimeSegment(RAW_base, trainNum_base, stationNum);
+    [startHour_res, endHour_res] = GetTrainTimeSegment(RAW_res, trainNum_res, stationNum);
+    startHour = min(startHour_base, startHour_res);
+    endHour   = max(endHour_base, endHour_res);
 
+    % ============ (2) 判断上下行 ============
+    DirectionSign_base = JudgeUpOrDown(RAW_base, trainNum_base, stationNum);
+    DirectionSign_res  = JudgeUpOrDown(RAW_res, trainNum_res, stationNum);
 
+    % ============ (3) 以基本图为基准计算站间距 ============
+    minTravelTime = GetStationInterval(RAW_base, trainNum_base, stationNum, DirectionSign_base);
 
-    % (1) First read the base train timetable and draw it in black color
-     colorMap = {'k', 'k'};   % 基本图采用黑色
-     % TODO: Get RAW data, etc. (trainNum, stationNum, DirectionSign, StationPosition, LineID)
-     DrawLineDigram(RAW, trainNum, stationNum, DirectionSign, StationPosition, LineID, colorMap)
+    % ============ (4) 以基本图为基准绘制背景网格和坐标轴 ============
+    StationPosition = DrawBackground(RAW_base, startHour, endHour, stationNum, minTravelTime, LineID);
 
-   % (2) Then read the rescheduled train timetable (vef) and draw it in red color (downward) and blue (upward)
-    colorMap = {'r', 'b'};   % 默认 1=下行(红)，2=上行(蓝)
-    
-    % TODO: Get RAW data, etc. (trainNum, stationNum, DirectionSign, StationPosition, LineID)
-    DrawLineDigram(RAW, trainNum, stationNum, DirectionSign, StationPosition, LineID, colorMap)
-    
-   % TODO：车次号只标注一次，不用重复标注
+    % ============ (5) 绘制基本计划运行图（黑色） ============
+    colorMap_base = {'k', 'k'};   % 基本图全部采用黑色
+    DrawLineDigram(RAW_base, trainNum_base, stationNum, DirectionSign_base, StationPosition, LineID, colorMap_base);
+
+    % ============ (6) 绘制调度计划运行图（下行红色，上行蓝色） ============
+    colorMap_res = {'r', 'b'};   % 1=下行(红)，2=上行(蓝)
+    DrawLineDigram(RAW_res, trainNum_res, stationNum, DirectionSign_res, StationPosition, LineID, colorMap_res);
+
+    % ============ (7) 标记车次号（只标注一次） ============
+    MarkTrainNumber(RAW_base, trainNum_base, StationPosition, LineID);
 end
 
 %% 函数名称：MarkTrainNumber
@@ -546,11 +568,15 @@ end
 function [ ] = MarkTrainNumber(RAW, trainNum, StationPosition, LineID)
     % 存放有效车站
     validStations = [];
-    % 判断某站是否处于指定线路
-    for j = 2:size(RAW,1)
-        LineInfo = RAW{j,4};
-        if IsStationOnLine(LineInfo,LineID)
-            validStations(end+1) = j-1;
+    % 判断某站是否处于指定线路（LineID 为空时使用全部车站）
+    if isempty(LineID) || (ischar(LineID) && strlength(LineID)==0)
+        validStations = 1:size(RAW,1)-1;
+    else
+        for j = 2:size(RAW,1)
+            LineInfo = RAW{j,4};
+            if IsStationOnLine(LineInfo,LineID)
+                validStations(end+1) = j-1;
+            end
         end
     end
 
@@ -564,20 +590,21 @@ function [ ] = MarkTrainNumber(RAW, trainNum, StationPosition, LineID)
         else
             continue; % 表头异常，跳过
         end
-            
+
         times = []; % 存储该列车到达时间
         rows = [];  % 存储到达时间对应行号
 
-    
+
         % 遍历RAW的所有行(跳过表头从第二行开始)
         for j = 2:size(RAW, 1)
 
-            % 新增：判断车站是否属于当前线路，找到当前线路最早的到达站
-            LineInfo = RAW{j, 4};    % 第4列第j行为j站的LineInfo信息
-
-            % 若不在指定线路号，则直接判断下一个车站
-            if ~IsStationOnLine(LineInfo, LineID)
-                continue;
+            % 判断车站是否属于当前线路（LineID 为空时不过滤）
+            if ~(isempty(LineID) || (ischar(LineID) && strlength(LineID)==0))
+                LineInfo = RAW{j, 4};    % 第4列第j行为j站的LineInfo信息
+                % 若不在指定线路号，则直接判断下一个车站
+                if ~IsStationOnLine(LineInfo, LineID)
+                    continue;
+                end
             end
 
             if isnumeric(RAW{j, baseCol}) && ~isnan(RAW{j, baseCol})
@@ -585,7 +612,11 @@ function [ ] = MarkTrainNumber(RAW, trainNum, StationPosition, LineID)
                 rows(end+1) = j;
             end
         end
-    
+
+        % 若无有效到达时间则跳过该车次
+        if isempty(times)
+            continue;
+        end
         [~, idx] = min(times);  % 获得最早的到达时间的索引值
         t = datevec(times(idx));
         x = t(4) * 3600 + t(5) * 60 + t(6) - 50;    % 计算x坐标并左移50, 防止重合

@@ -1,0 +1,62 @@
+Model summary.
+ - Num. variables     : 21870
+ - Num. constraints   : 249150
+ - Num. nonzeros      : 1030380
+ - Num. integer vars. : 20490
+ - Num. free vars.    : 0
+ - Num. ranged vars.  : 21870
+ - Num. eq. cons.     : 19140
+ - Bound range        : [1.0e+00,4.0e+06]
+ - Objective range    : [1.0e+00,1.0e+00]
+
+Branch-and-cut method started.
+Original model: rows = 249150 columns = 21870 nonzeros = 1030380
+Tolerance: primal = 1e-06 int = 1e-06 mipgap = 0.0001 mipgapAbs = 1e-06
+Limit: time = 1.79769313486232e+308 node = -1 stalling = -1 solution = -1
+presolver terminated; took 263 ms
+presolver terminated; took 1267 ms
+Parallelism: root=8, tree=16
+Model summary.
+ - Num. variables     : 4279
+ - Num. constraints   : 20760
+ - Num. nonzeros      : 61765
+ - Num. free vars.    : 0
+ - Num. ranged vars.  : 4279
+ - Num. eq. cons.     : 0
+ - Bound range        : [1.0e+00,1.0e+06]
+ - Objective range    : [1.0e+00,2.0e+00]
+ - Matrix range       : [1.0e+00,9.8e+05]
+
+Presolver started.
+Presolver terminated. Time : 0.141s
+
+Simplex method started.
+Model fingerprint: mdnZnFWYhdXZvJmYld3bgV2Y
+
+    Iteration       Objective       Dual Inf.     Primal Inf.     Time
+            0     2.36219e+15      2.3621e+02      1.4529e+12     0.19s    
+         3270     3.05339e+07      0.0000e+00      1.2722e+05     0.69s    
+         4109     3.00412e+07      0.0000e+00      0.0000e+00     0.75s    
+Postsolver started.
+Simplex method terminated. Time : 0.627s
+
+Root relaxation: 23434 iteration = 4109 time = 0.788
+
+Evaluated  InQueue     DualBound     Incumbent      Gap      Time
+        0        0  2.343400e+04  4.667198e+06   99.50%        2s
+        0        0  2.343400e+04  4.657940e+06   99.50%        5s
+        0        0  2.343400e+04  4.587907e+06   99.49%        5s
+        0        0  2.343400e+04  2.532300e+04    7.46%       13s
+        0        0  2.343400e+04  2.532300e+04    7.46%       18s
+        0        0  2.532300e+04  2.532300e+04    0.00%       68s
+Branch-and-cut method terminated. Time : 77.592s
+
+Optimizer summary.
+ - Optimizer used     : Branch-and-cut method
+ - Optimizer status   : OPTIMAL
+ - Total time         : 77.673s
+
+Solution summary.
+ - Primal objective   : 2.5323000000e+04 
+ - Dual bound         : 2.5323000000e+04 
+ - Relative gap       : 0.0000%

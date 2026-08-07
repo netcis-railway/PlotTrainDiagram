@@ -1,0 +1,10 @@
+=== AGV Scheduling Log Started at 2026-02-08 07:33:29.361210 ===
+Input case: terminal_print
+Algorithm: 
+CPU cores/threads used: 1
+Log file: ./data/S1_60tra_23sta_t8_M_new/log_terminal_print__20260208_073329.txt
+============================================================
+开始求解
+Received other exception.
+ - Reason        : name 'type_solver' is not defined
+求解日期：2026-02-08_07:33:29
