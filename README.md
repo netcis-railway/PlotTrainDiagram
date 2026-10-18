@@ -1,18 +1,40 @@
-# 列车运行图绘制系统
+# 十分格列车运行图绘制和时刻表分析工具
 
-基于 MATLAB 的列车运行图自动绘制工具，支持 v3→v3f 格式转换、基本图与调度图对比等功能。
+<p align="center">
+    <img width="110" height="110" alt="logoNew_small" src="https://github.com/user-attachments/assets/82bdd376-cead-42fc-b33c-dfcb58b2e92c" />
+</p>    
+<p align="center">
+    <a href="https://www.mathworks.com/products/matlab.html">
+        <img src="https://img.shields.io/badge/MATLAB-R2020b+-orange.svg?logo=mathworks&logoColor=white" alt="MATLAB" />
+    </a>
+    <a href="https://www.python.org/">
+        <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python" />
+    </a>
+    <a href="Private">
+        <img src="https://img.shields.io/badge/License-Proprietary-lightgrey.svg" alt="License" />
+    </a>
+</p>
 
----
+仓库链接:
+[HTTPS链接：https://github.com/netcis-railway/PlotTrainDiagram.git](https://github.com/netcis-railway/PlotTrainDiagram.git)
+[SSH链接：git@github.com:netcis-railway/PlotTrainDiagram.git](git@github.com:netcis-railway/PlotTrainDiagram.git)
 
-## 目录结构
+2026.10.20 代码仓库从netcis0xD/public 迁移到了组织netcis-railway下.
+
+参考《列车运行图编制管理规则》（中国铁道出版社 2008年）、《铁路线路设计规范》、《铁路技术管理规程》等行业管理性文件、技术标准与管理办法， 绘制十分格列车运行图的MATLAB作图工具，支持 v3→v3f 格式转换、基本图与调度图对比等功能。以及基于 Python、MATLAB的列车时刻表分析工具。 
+
+[![京沪高铁运行图示例](figures/京沪高铁运行图示例.png)]
+
+## 0 dev版开发备注
+@王骞 v4版的作图程序，新建目录 DrawTrainDiagramV4
+
+@龙麟 计划调整图vs基本图代码（蓝色基本图，红色调度调整计划图）， 保持原有基于v3f版的基础作图程序，补充到DrawTrainDigramFunctionV3f版目录下，也放到这个子目录下，新建一个代码文件(比如 plotTTScheduledvsBase.m)
+
+
+## 1. 目录结构
 
 ```
-public/
-├── 论文直接画图matlab代码/         # 论文对比运行图一键绘制（基线蓝 + 求解红，自包含）
-│   ├── DrawFinalDataCompare.m          # 入口脚本（配置+绘图+存 .fig/.png）
-│   ├── DrawTrainDigramFunction_v3f_v5.m# 核心函数库
-│   └── README.md                       # 详细使用说明（数据自备，见该 README）
-│
+PlotTrainDiagram/
 ├── DrawTrainDigramFunctionV3f/    # 函数库与工具（主要工作区）
 │   ├── DrawTrainDigramFunctionV3f.m   # 核心绘图函数库
 │   ├── DrawV3f.m                      # 原始单时刻表绘图脚本
@@ -21,10 +43,16 @@ public/
 │   └── Train TimeTable final data Metro (version 3).xlsx  # 示例数据
 │
 └── 画图新版V3F/                    # 参考实现（新版函数库 + 多种画图脚本）
-    ├── DrawTrainDigramFunction_v3f_v5.m  # 新版函数库（功能更全）
-    ├── DrawCompare_v3f.m                 # 计划/实际对比图（参考）
-    ├── AddSeqV3f.m                       # 批量格式转换（参考）
-    └── ...各种测试数据与脚本
+│   ├── DrawTrainDigramFunction_v3f_v5.m  # 新版函数库（功能更全）
+│   ├── DrawCompare_v3f.m                 # 计划/实际对比图（参考）
+│   ├── AddSeqV3f.m                       # 批量格式转换（参考）
+│   └── ...各种测试数据与脚本
+│
+├── 论文直接画图matlab代码/         # 论文对比运行图一键绘制（基线蓝 + 求解红，自包含）
+│   ├── DrawFinalDataCompare.m          # 入口脚本（配置+绘图+存 .fig/.png）
+│   ├── DrawTrainDigramFunction_v3f_v5.m# 核心函数库
+│   └── README.md                       # 详细使用说明（数据自备，见该 README）
+│
 ```
 
 ---
@@ -172,3 +200,5 @@ run('ConvertV3toV3f');
 - **2026-06**: 新增对比绘图、批量转换工具
 - **2026-08**: 完善 `DrawLineDigramBasevsRescheduled` 对比画图函数；新增独立 `ConvertV3toV3f` 脚本；修复空 LineID 处理
 - **2026-10**: 新增 `论文直接画图matlab代码/` 自包含文件夹（`DrawFinalDataCompare.m` 一键对比出图 + 使用说明）
+
+
