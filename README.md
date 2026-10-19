@@ -8,6 +8,11 @@
 
 ```
 public/
+├── 论文直接画图matlab代码/         # 论文对比运行图一键绘制（基线蓝 + 求解红，自包含）
+│   ├── DrawFinalDataCompare.m          # 入口脚本（配置+绘图+存 .fig/.png）
+│   ├── DrawTrainDigramFunction_v3f_v5.m# 核心函数库
+│   └── README.md                       # 详细使用说明（数据自备，见该 README）
+│
 ├── DrawTrainDigramFunctionV3f/    # 函数库与工具（主要工作区）
 │   ├── DrawTrainDigramFunctionV3f.m   # 核心绘图函数库
 │   ├── DrawV3f.m                      # 原始单时刻表绘图脚本
@@ -25,6 +30,17 @@ public/
 ---
 
 ## 新增功能
+
+### 0. 论文对比运行图一键绘制（论文直接画图matlab代码）
+
+自包含文件夹，入口脚本 `DrawFinalDataCompare.m` 一键绘制论文对比运行图：
+基线（计划）蓝色 + 求解结果红色，输出 `.fig` 源文件与 `.png` 图片。
+数据（`基线.xlsx`、`有平行.xlsx`、`无平行.xlsx`）需自备放在 `最终数据/` 子文件夹，
+格式要求与使用说明见该文件夹内 README。
+
+```bash
+matlab -batch "run('...\论文直接画图matlab代码\DrawFinalDataCompare.m')"
+```
 
 ### 1. 基本图与调度图对比绘制
 
@@ -155,3 +171,4 @@ run('ConvertV3toV3f');
 - **2026-04**: 新增 v3→v3f 自动转换、车次高亮
 - **2026-06**: 新增对比绘图、批量转换工具
 - **2026-08**: 完善 `DrawLineDigramBasevsRescheduled` 对比画图函数；新增独立 `ConvertV3toV3f` 脚本；修复空 LineID 处理
+- **2026-10**: 新增 `论文直接画图matlab代码/` 自包含文件夹（`DrawFinalDataCompare.m` 一键对比出图 + 使用说明）
