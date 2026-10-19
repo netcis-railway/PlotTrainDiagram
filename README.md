@@ -28,10 +28,8 @@ SSH链接：[git@github.com:netcis-railway/PlotTrainDiagram.git](git@github.com:
 
 [![京沪高铁运行图示例](figures/京沪高铁运行图示例.png)
 
-<<<<<<< HEAD
 ## 0 dev版开发备注
 @王骞 v4版的作图程序，新建目录 DrawTrainDiagramV4
-=======
 横轴为一天内的时刻（秒），纵轴为沿线路排列的车站；下行列车以红色表示，上行列车以蓝色表示。
 
 ## 代码功能描述
@@ -67,7 +65,6 @@ SSH链接：[git@github.com:netcis-railway/PlotTrainDiagram.git](git@github.com:
 
 
 ## 改进计划
->>>>>>> 8287fca (add：补充了程序代码概述)
 
 @龙麟 计划调整图vs基本图代码（蓝色基本图，红色调度调整计划图）， 保持原有基于v3f版的基础作图程序，补充到DrawTrainDigramFunctionV3f版目录下，也放到这个子目录下，新建一个代码文件(比如 plotTTScheduledvsBase.m)
 
@@ -94,6 +91,8 @@ PlotTrainDiagram/
 │   ├── DrawTrainDigramFunction_v3f_v5.m# 核心函数库
 │   └── README.md                       # 详细使用说明（数据自备，见该 README）
 │
+├── DrawTrainDiagramV4/              # 参适配V4版excel数据的运行图绘图.
+│   ├── readme_v4.md                 # 
 ```
 
 ---
