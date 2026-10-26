@@ -1,0 +1,16 @@
+{
+  "down": "#d64444",
+  "up": "#287ac4",
+  "unknown": "#8c67c6",
+  "base": "#172438",
+  "base_dark": "#d7e2f1",
+  "grid": "#5baf79",
+  "highlight": "#f5c842",
+  "width": 1.5,
+  "point_radius": 2.5,
+  "grid_minutes": 10,
+  "font_size": 12,
+  "train_styles": {},
+  "track_gap": 1,
+  "track_yita_seconds": 1
+}

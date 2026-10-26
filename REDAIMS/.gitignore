@@ -1,0 +1,17 @@
+.venv/
+.devtools/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+node_modules/
+frontend/dist/
+data/*
+!data/.gitkeep
+!data/source_files/
+!data/staging/
+data/source_files/*
+!data/source_files/.gitkeep
+data/staging/*
+!data/staging/.gitkeep

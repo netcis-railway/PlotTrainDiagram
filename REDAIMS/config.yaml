@@ -1,0 +1,12 @@
+server:
+  host: 127.0.0.1
+  port: 8000
+storage:
+  database: data/rail_data.duckdb
+  source_files: data/source_files
+  staging: data/staging
+  logs: data/logs
+limits:
+  upload_mb: 32
+  preview_rows: 200
+  max_cells: 2000000
