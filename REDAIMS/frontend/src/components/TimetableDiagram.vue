@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { formatPath, type Change } from '../api/baseImport'
-import { diagramApi, type PlotContext, type PlotData, type PlotSeries, type PlotIssue, type PlotEvent } from '../api/diagram'
+import { diagramApi, type PlotContext, type PlotData, type PlotSeries, type PlotIssue } from '../api/diagram'
 import { fitViewport, localTime, timeLabel, timeRange, zoomViewport, type Viewport } from '../diagramGeometry'
 import DiagramCanvas from './DiagramCanvas.vue'
+import DiagramTrainDetails from './DiagramTrainDetails.vue'
 const props = defineProps<{ objectType: 'base' | 'run'; objectId: string; revision: string; dateBase: string; originalDateBase: string; changes: Change[]; initialLine: string }>()
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement | null>(null), previousFocus = document.activeElement as HTMLElement | null
 const context = ref<PlotContext | null>(null), data = ref<PlotData | null>(null), busy = ref(false), error = ref('')
 const line = ref(''), overlay = ref(false), reverse = ref(false), stationIds = ref<string[]>([]), trainIds = ref<string[]>([]), selected = ref<string[]>([])
-const stationSearch = ref(''), trainSearch = ref(''), from = ref(''), to = ref(''), logText = ref(''), detailKey = ref(''), detailOpen = ref(false)
+const stationSearch = ref(''), trainSearch = ref(''), from = ref(''), to = ref(''), logText = ref(''), detailOpen = ref(false)
 const expanded = ref<string[]>([]), trackStation = ref('')
 const trackResource = computed(() => data.value?.track_stations.find(resource => resource.node_id === trackStation.value))
 const viewport = ref<Viewport>({ x0: 0, x1: 3600, y0: 0, y1: 1000 })
@@ -20,7 +21,10 @@ const displayed = computed(() => data.value?.series.filter(series => trainIds.va
 const stationOptions = computed(() => data.value?.axis.stations.filter(s => `${s.node_name_chn} ${s.node_name}`.includes(stationSearch.value)) || [])
 const trainOptions = computed(() => data.value?.series.filter(s => `${s.train_course_id} ${s.object_name} ${s.train_base_date}`.includes(trainSearch.value)) || [])
 const issues = computed(() => data.value ? [...data.value.issues.filter(i => i.code !== 'style_config'), ...styleIssues.value] : context.value?.issues || [])
-const detail = computed(() => data.value?.series.find(series => series.key === detailKey.value))
+const selectedDetails = computed(() => {
+  const byKey = new Map(data.value?.series.map(series => [series.key, series]) || [])
+  return selected.value.map(key => byKey.get(key)).filter((series): series is PlotSeries => !!series)
+})
 const ready = computed(() => data.value?.can_plot && stationIds.value.length && displayed.value.some(s => s.points.length))
 function resetRange() {
   if (!data.value) return
@@ -49,7 +53,6 @@ async function loadData(reason: 'line' | 'overlay' | 'refresh' | 'tracks' | 'sty
     data.value = result; expanded.value = result.expanded_stations
     if (!result.track_stations.some(resource => resource.node_id === trackStation.value)) trackStation.value = result.track_stations.find(resource => resource.can_expand)?.node_id || result.track_stations[0]?.node_id || ''
     styleIssues.value = result.issues.filter(i => i.code === 'style_config')
-    if (!result.series.some(series => series.key === detailKey.value)) detailKey.value = result.series[0]?.key || ''
     if (['line','refresh'].includes(reason) || !old?.can_plot) resetRange()
   } catch (e) { if (version === generation) { data.value = null; error.value = String(e) } }
   finally { if (version === generation) busy.value = false }
@@ -74,9 +77,11 @@ function applyTime() {
 }
 function highlight(key: string, add = false) {
   selected.value = add ? selected.value.includes(key) ? selected.value.filter(id => id !== key) : [...selected.value, key] : [key]
-  detailKey.value = key
 }
-function inspectSeries(series: PlotSeries) { highlight(series.key); detailOpen.value = true }
+function inspectSeries(series: PlotSeries) {
+  if (!selected.value.includes(series.key)) selected.value = [...selected.value, series.key]
+  detailOpen.value = true
+}
 async function toggleTrack(id: string) {
   if (busy.value) return
   trackStation.value = id
@@ -85,16 +90,6 @@ async function toggleTrack(id: string) {
   await loadData('tracks')
 }
 async function collapseTracks() { if (!busy.value) { expanded.value = []; await loadData('tracks') } }
-function usageLabel(event: PlotEvent) {
-  const value = event.track_usage
-  if (!value) return '未展开'
-  if (value.direction === 'unknown') return '方向未定'
-  if (value.adopted_track == null) return '无法定位股道'
-  const track = `${value.adopted_track}${value.defaulted ? '（绘图默认）' : ''}`
-  if (value.start_seconds != null && value.end_seconds != null) return value.can_occupy
-    ? `${track} · ${timeLabel(value.start_seconds, true)} ～ ${timeLabel(value.end_seconds, true)}` : `${track} · 占用区间倒置`
-  return `${track} · 仅部分进路`
-}
 async function readLog() { try { const log = await diagramApi.log(); logText.value = `${log.filename}\n${log.text}` } catch (e) { error.value = String(e) } }
 async function refreshStyles() {
   if (busy.value || !data.value || loadingStyles) return
@@ -137,13 +132,28 @@ onUnmounted(() => { generation++; if (styleTimer) window.clearInterval(styleTime
       </template>
       <p class="muted">也可双击图中站名展开/收起。股道自下向上按实际编号升序，*与虚线表示正线；上边界为下行到达/上行出发，下边界相反。间距 {{ data.styles.track_gap * 5 }}px，进路系数 {{ data.styles.track_yita_seconds }}秒；占用计算仅用于绘图。</p>
     </details>
-    <div class="diagram-legend"><span>基本图：主题对比色，叠加时为虚线</span><span :style="{ color: data.styles.down }">● 下行</span><span :style="{ color: data.styles.up }">● 上行</span><span :style="{ color: data.styles.unknown }">● 方向未定</span><span>时序倒置：橙色虚线</span></div>
-    <p class="muted diagram-instruction">滚轮缩放时间，Shift+滚轮缩放站轴；拖动平移。方向键平移，+/-缩放，Home恢复；点击运行线高亮，Ctrl+点击多选。筛选保留完整站轴间距和已有断点；双击站名展开/收起股道。</p>
+    <div class="diagram-legend"><span>基本图：主题对比色，叠加时为虚线</span><span :style="{ color: data.styles.down }">● 下行</span><span :style="{ color: data.styles.up }">● 上行</span><span :style="{ color: data.styles.unknown }">● 方向未定</span><span>时序倒置：橙色虚线</span><span style="color: #e53935">▲ 通过列车股道未判定</span></div>
+    <p class="muted diagram-instruction">以鼠标位置为中心：滚轮同步缩放两轴，Ctrl+滚轮仅缩放时间轴，Shift+滚轮仅缩放车站轴；拖动平移。方向键平移，+/-缩放，Home恢复；点击运行线高亮，Ctrl+点击多选。筛选保留完整站轴间距和已有断点；双击站名展开/收起股道。</p>
     <p v-if="data.can_plot" class="diagram-range" role="status">当前时间范围：{{ timeLabel(viewport.x0, true) }} ～ {{ timeLabel(viewport.x1, true) }} · {{ displayed.length }}组列车 · 站轴按 NODE_SEQ_OF_LINE / PASS→PASS</p>
     <DiagramCanvas v-if="ready && !busy" v-model:viewport="viewport" :data="data" :series="displayed" :station-ids="stationIds" :selected="selected" :reverse="reverse" @select="highlight" @reset="resetRange" @toggle-track="toggleTrack" />
     <p v-else-if="!busy" class="empty-state">{{ data.can_plot ? '当前筛选没有可绘制的数据，请选择车站和列车。' : '该运行图暂不能绘制，请查看下方具体问题。' }}</p>
-    <details :open="detailOpen" @toggle="detailOpen = ($event.target as HTMLDetailsElement).open"><summary>所选列车时刻明细{{ detail ? `：${detail.train_course_id}` : '' }}</summary><select v-model="detailKey" aria-label="明细列车"><option v-for="series in data.series" :key="series.key" :value="series.key">{{ series.train_course_id }} · {{ series.object_type === 'base' ? '基本图' : series.object_name }}</option></select><div v-if="detail && detailOpen" class="table-wrap"><table><thead><tr><th>车站</th><th>SEQ</th><th>到达</th><th>出发</th><th>股道</th><th>绘图占用</th><th>来源</th></tr></thead><tbody><tr v-for="event in detail.events" :key="event.id"><th>{{ event.node_name_chn }}</th><td>{{ event.visit_seq }}</td><td>{{ event.arrival ? localTime(data.object.date_base || '', event.arrival.seconds).replace('T',' ') : '空' }}</td><td>{{ event.departure ? localTime(data.object.date_base || '', event.departure.seconds).replace('T',' ') : '空' }}</td><td>{{ event.track_code ?? '未记录' }}</td><td>{{ usageLabel(event) }}</td><td>{{ event.source.sheet }} · {{ event.source.row }}</td></tr></tbody></table></div></details>
-    <details><summary>样式配置</summary><p class="muted">{{ data.style_source }}；可设置上下行/基本图颜色、十分钟网格、线宽、track_gap（单位5px）、track_yita_seconds（秒）和按系列key配置单车样式。保存JSON后数秒内自动应用，也可点击“刷新图形数据和样式”。当前明细列车样式key：{{ detail?.key || '请选择列车' }}。</p></details>
+    <details :open="detailOpen" @toggle="detailOpen = ($event.target as HTMLDetailsElement).open">
+      <summary>所选列车时刻明细（{{ selectedDetails.length }}组列车）</summary>
+      <p class="muted">各列车按车站对齐显示。Ctrl+点击运行线可多选，也可在下方勾选需要对比的列车；同车次的基本图与run分别列出。</p>
+      <details>
+        <summary>选择明细列车</summary>
+        <div class="checkbox-options">
+          <label v-for="train in data.series" :key="train.key">
+            <input v-model="selected" type="checkbox" :value="train.key" />
+            {{ train.train_course_id }} · {{ train.object_type === 'base' ? '基本图' : train.object_name }} · {{ train.train_base_date }}
+          </label>
+        </div>
+      </details>
+      <button :disabled="!selected.length" @click="selected = []">清空选择</button>
+      <DiagramTrainDetails v-if="detailOpen && selectedDetails.length" :series="selectedDetails" :stations="data.axis.stations" :date-base="data.object.date_base || ''" />
+      <p v-else-if="!selectedDetails.length" class="empty-state">请选择需要对比的列车。</p>
+    </details>
+    <details><summary>样式配置</summary><p class="muted">{{ data.style_source }}；可设置上下行/基本图颜色、十分钟网格、线宽、track_gap（单位5px）、track_yita_seconds（秒）和按系列key配置单车样式。保存JSON后数秒内自动应用，也可点击“刷新图形数据和样式”。所选列车样式key：{{ selectedDetails.map(series => series.key).join('、') || '请选择列车' }}。</p></details>
   </template>
   <details class="diagram-issues" :open="issues.some(i => i.severity === 'error')"><summary>绘图提示（{{ issues.length }}）</summary><ul><li v-for="(issue,index) in issues" :key="index" :class="issue.severity === 'error' ? 'error' : 'muted'">{{ issue.severity === 'error' ? '错误' : '提示' }}：{{ issue.message }}</li></ul><p v-if="data">{{ !issues.length ? '本次无绘图提示。' : data.log_written && styleLogWritten ? '本次提示已记录于绘图日志。' : '日志写入失败，请核对日志目录。' }}</p><button @click="readLog">查看绘图日志</button><pre v-if="logText" class="diagram-log">{{ logText }}</pre></details>
 </dialog></template>

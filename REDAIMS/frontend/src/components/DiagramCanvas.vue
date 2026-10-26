@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PlotData, PlotSeries, PlotPoint, PlotSegment } from '../api/diagram'
-import { createTrackLayout, projectOnTracks, stationAtPixel, trackExtraHeight, visibleTrackStations, type TrackLayout } from '../trackLayout'
+import { createTrackLayout, projectOnTracks, trackExtraHeight, visibleTrackStations, wheelViewport, type TrackLayout } from '../trackLayout'
 import { clipSegment, panViewport, project, spacedLabels, tickStep, timeLabel, localTime, zoomViewport, type Bounds, type Viewport } from '../diagramGeometry'
 const props = defineProps<{ data: PlotData; series: PlotSeries[]; stationIds: string[]; selected: string[]; reverse: boolean; viewport: Viewport }>()
 const emit = defineEmits<{ 'update:viewport': [value: Viewport]; select: [key: string, add: boolean]; reset: []; toggleTrack: [id: string] }>()
@@ -11,6 +11,7 @@ const hover = ref<Hit | null>(null)
 const hoverEvent = computed(() => hover.value?.series.events.find(event => event.id === hover.value?.point.event_id))
 const hoverEnd = computed(() => { const hit = hover.value; return hit?.segment ? hit.series.events.find(event => event.id === hit.series.points[hit.segment!.to].event_id) : null })
 const hoverPosition = ref({ x: 0, y: 0 })
+const usagePointLabels = { track_entry: '进入股道', track_exit: '离开股道', pass_track: '通过股道标记', track_unassigned: '股道未判定' }
 const trackStations = computed(() => visibleTrackStations(props.data, props.stationIds, props.viewport))
 const extraHeight = computed(() => trackExtraHeight(trackStations.value, props.data.styles.track_gap * 5))
 let layout: TrackLayout | null = null
@@ -51,9 +52,18 @@ function draw() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'top'
   for (let second = Math.ceil(view.x0 / step) * step; second <= view.x1; second += step) {
     const pixel = project({ seconds: second, y: view.y0 }, view, box, props.reverse)
-    ctx.beginPath(); ctx.moveTo(pixel.x, box.top); ctx.lineTo(pixel.x, box.top + box.height); ctx.stroke()
+    if (second % 3600 !== 0) { ctx.beginPath(); ctx.moveTo(pixel.x, box.top); ctx.lineTo(pixel.x, box.top + box.height); ctx.stroke() }
     ctx.globalAlpha = 1; ctx.fillStyle = css.getPropertyValue('--text').trim(); ctx.fillText(timeLabel(second), pixel.x, box.top + box.height + 10); ctx.globalAlpha = .5
   }
+  // Hour lines are independent of the adaptive minor ticks (e.g. a 40-minute step).
+  // At extreme zoom-out retain whole-hour multiples without painting subpixel grids.
+  const hourStep = Math.max(1, Math.ceil((view.x1 - view.x0) / 3600 / Math.max(1, box.width))) * 3600
+  ctx.strokeStyle = '#2e9f55'; ctx.lineWidth = 2; ctx.globalAlpha = 1; ctx.setLineDash([])
+  for (let second = Math.ceil(view.x0 / hourStep) * hourStep; second <= view.x1; second += hourStep) {
+    const pixel = project({ seconds: second, y: view.y0 }, view, box, props.reverse)
+    ctx.beginPath(); ctx.moveTo(pixel.x, box.top); ctx.lineTo(pixel.x, box.top + box.height); ctx.stroke()
+  }
+  ctx.strokeStyle = styles.grid; ctx.lineWidth = .6; ctx.globalAlpha = .5
   const axisLabels = stations.filter(station => station.y >= view.y0 && station.y <= view.y1).map(station => ({
     station, pixel: projectOnTracks({ seconds: view.x0, y: station.y }, activeLayout),
   }))
@@ -96,6 +106,7 @@ function draw() {
   ctx.fillText(`时间 · 基准日 ${props.data.object.date_base}（跨日以天偏移标示）`, box.left, height - 25)
   ctx.save(); ctx.beginPath(); ctx.rect(box.left, box.top, box.width, box.height); ctx.clip()
   const allowed = new Set(props.stationIds)
+  const unassigned: { x: number; y: number; hit: Hit }[] = []
   for (const series of props.series) {
     const events = new Map(series.events.map(event => [event.id, event])), selected = props.selected.includes(series.key)
     const override = styles.train_styles[series.key], stroke = color(series), lineWidth = override?.width || styles.width
@@ -131,8 +142,11 @@ function draw() {
     series.points.forEach((point, index) => {
       const pixel = pixels[index]
       if (!visible(point) || pixel.x < box.left || pixel.x > box.left + box.width || pixel.y < box.top || pixel.y > box.top + box.height) return
-      ctx.moveTo(pixel.x + styles.point_radius, pixel.y); ctx.arc(pixel.x, pixel.y, styles.point_radius, 0, Math.PI * 2)
-      screenPoints.push({ x: pixel.x, y: pixel.y, hit: { series, point } })
+      if (point.usage_kind === 'track_unassigned') unassigned.push({ ...pixel, hit: { series, point } })
+      else {
+        ctx.moveTo(pixel.x + styles.point_radius, pixel.y); ctx.arc(pixel.x, pixel.y, styles.point_radius, 0, Math.PI * 2)
+        screenPoints.push({ x: pixel.x, y: pixel.y, hit: { series, point } })
+      }
       if (!label) label = pixel
     })
     ctx.fill()
@@ -143,6 +157,15 @@ function draw() {
       ctx.fillText(series.train_course_id, pixel.x + 5, pixel.y + (series.object_type === 'base' ? -5 : 5))
     }
   }
+  // Draw unresolved-track markers last so overlay lines cannot hide their warning shape.
+  const radius = Math.max(5, styles.point_radius * 2)
+  ctx.fillStyle = '#e53935'; ctx.strokeStyle = css.getPropertyValue('--surface').trim() || '#fff'; ctx.lineWidth = 1
+  for (const marker of unassigned) {
+    ctx.beginPath(); ctx.moveTo(marker.x, marker.y - radius)
+    ctx.lineTo(marker.x + radius, marker.y + radius); ctx.lineTo(marker.x - radius, marker.y + radius)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+  }
+  screenPoints = unassigned.concat(screenPoints)
   ctx.restore(); ctx.globalAlpha = 1; ctx.setLineDash([])
 }
 function hitTest(x: number, y: number): Hit | null {
@@ -189,10 +212,8 @@ function doubleClick(event: MouseEvent) {
   if (nearest && Math.abs(nearest.y - p.y) <= Math.max(9, props.data.styles.font_size)) emit('toggleTrack', nearest.id)
 }
 function wheel(event: WheelEvent) {
-  const p = position(event), ax = Math.max(0, Math.min(1, (p.x - box.left) / box.width)), view = props.viewport
-  const y = layout ? stationAtPixel(p.y, layout) : view.y0 + (p.y - box.top) / box.height * (view.y1 - view.y0)
-  const ay = Math.max(0, Math.min(1, (y - view.y0) / (view.y1 - view.y0)))
-  emit('update:viewport', zoomViewport(view, event.deltaY > 0 ? 1.15 : 1 / 1.15, ax, ay, event.shiftKey ? 'station' : 'time')); hover.value = null
+  if (!layout || event.deltaY === 0) return
+  emit('update:viewport', wheelViewport({ ...layout, view: props.viewport }, position(event), event)); hover.value = null
 }
 function keyboard(event: KeyboardEvent) {
   const view = props.viewport, dx = (view.x1 - view.x0) * .1, dy = (view.y1 - view.y0) * .1
@@ -214,7 +235,8 @@ onUnmounted(() => { observer?.disconnect(); theme?.disconnect(); cancelAnimation
     <div>{{ hoverEvent.node_name_chn }} · SEQ {{ hoverEvent.visit_seq }} · 股道 {{ hoverEvent.track_code ?? '未记录' }}</div>
     <div>到达：{{ hoverEvent.arrival ? localTime(data.object.date_base || '', hoverEvent.arrival.seconds).replace('T',' ') : '空' }}</div>
     <div>出发：{{ hoverEvent.departure ? localTime(data.object.date_base || '', hoverEvent.departure.seconds).replace('T',' ') : '空' }}</div>
-    <div v-if="hover.point.calculated">计算点：{{ hover.point.usage_kind === 'track_entry' ? '进入股道' : '离开股道' }} {{ timeLabel(hover.point.seconds, true) }}（用于绘图）</div>
+    <div v-if="hover.point.calculated">{{ hover.point.usage_kind ? usagePointLabels[hover.point.usage_kind] : '计算点' }}： {{ timeLabel(hover.point.seconds, true) }}（用于绘图）</div>
+    <div v-if="hoverEvent.track_usage?.passing && hoverEvent.track_usage.adopted_track == null">▲ 红色三角形：股道未判定</div>
     <div v-if="hoverEvent.track_usage?.adopted_track != null">绘图股道 {{ hoverEvent.track_usage.adopted_track }}{{ hoverEvent.track_usage.defaulted ? '（空值采用1，仅显示）' : '' }}</div>
     <div>列车基准日 {{ hover.series.train_base_date }}</div><div>{{ hoverEvent.source.sheet }} · 源行 {{ hoverEvent.source.row }}</div>
   </div>

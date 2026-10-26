@@ -1,5 +1,5 @@
 import type { PlotData, PlotPoint, PlotStation, TrackResource } from './api/diagram'
-import { project, type Bounds, type Viewport } from './diagramGeometry'
+import { project, zoomViewport, type Bounds, type Viewport } from './diagramGeometry'
 export interface TrackBand { station: PlotStation; resource: TrackResource; baseY: number; center: number; half: number }
 export function visibleTrackStations(data: PlotData, ids: string[], view: Viewport) {
   const resources = new Map(data.track_stations.map(resource => [resource.node_id, resource]))
@@ -18,6 +18,15 @@ export function createTrackLayout(view: Viewport, box: Bounds, reverse: boolean,
   let added = 0
   for (const band of bands) { band.center = band.baseY + added + band.half; added += band.half * 2 }
   return { view, box, baseBox, reverse, bands, gap }
+}
+export function wheelViewport(layout: TrackLayout, pixel: { x: number; y: number },
+  event: Pick<WheelEvent, 'deltaY' | 'ctrlKey' | 'shiftKey'>) {
+  if (event.deltaY === 0) return layout.view
+  const view = layout.view
+  const ax = Math.max(0, Math.min(1, (pixel.x - layout.box.left) / layout.box.width))
+  const ay = Math.max(0, Math.min(1, (stationAtPixel(pixel.y, layout) - view.y0) / (view.y1 - view.y0)))
+  return zoomViewport(view, event.deltaY > 0 ? 1.15 : 1 / 1.15, ax, ay,
+    event.ctrlKey ? 'time' : event.shiftKey ? 'station' : 'both')
 }
 export type TrackLayout = ReturnType<typeof createTrackLayout>
 export function projectOnTracks(point: Pick<PlotPoint, 'seconds' | 'y' | 'track_offset'>, layout: TrackLayout) {

@@ -64,6 +64,48 @@ def track_resources(infrastructure, axis, line_ind):
     return resources
 
 
+def pass_through(train, event, resource, arrival_index, departure_index, warn):
+    """Connect equal-time boundaries and mark the assigned track without yita offsets."""
+    points = train["points"]
+    tracks = [track["number"] for track in resource["tracks"]]
+    track = event["track_code"]
+    usage = event["track_usage"]
+    assigned = type(track) is int and track in tracks
+    if assigned:
+        level = (len(tracks) - 1) / 2 - tracks.index(track)
+        seconds = points[arrival_index]["seconds"]
+        usage.update(
+            adopted_track=track, start_seconds=seconds, end_seconds=seconds, can_occupy=True
+        )
+    else:
+        main_tracks = {
+            direction["main_track"]
+            for direction in resource["directions"].values()
+            if direction.get("main_track") in tracks
+        }
+        levels = [(len(tracks) - 1) / 2 - tracks.index(main) for main in main_tracks]
+        level = sum(levels) / len(levels) if levels else 0
+        warn(
+            "track_missing" if track is None else "track_invalid",
+            "未指定股道，通过点以红色三角形标记未判定股道"
+            if track is None
+            else "股道不在所选线路/车站的真实集合中，通过点以红色三角形标记未判定股道",
+        )
+        if not levels:
+            warn("track_main_missing", "本站未配置正线，未判定股道标记显示在股道展开区中心")
+    train["segments"].append(
+        {"from": arrival_index, "to": departure_index, "kind": "track_pass", "anomaly": False}
+    )
+    points.append(
+        {
+            **points[arrival_index],
+            "track_offset": level,
+            "calculated": True,
+            "usage_kind": "pass_track" if assigned else "track_unassigned",
+        }
+    )
+
+
 def expand_track_usage(series, resources, requested, yita):
     by_node = {resource["node_id"]: resource for resource in resources}
     unknown = set(requested) - set(by_node)
@@ -123,8 +165,16 @@ def expand_track_usage(series, resources, requested, yita):
                 )
 
             direction = train["direction"]
+            ai, di = (
+                point_ids.get((event["id"], "arrival")),
+                point_ids.get((event["id"], "departure")),
+            )
+            passing = (
+                ai is not None and di is not None and points[ai]["seconds"] == points[di]["seconds"]
+            )
             usage = {
                 "direction": direction,
+                "passing": passing,
                 "original_track": event["track_code"],
                 "adopted_track": None,
                 "defaulted": False,
@@ -134,7 +184,9 @@ def expand_track_usage(series, resources, requested, yita):
             }
             event["track_usage"] = usage
             if direction == "unknown":
-                warn("track_direction", "方向未定，保留原始到发点，不猜测上下到发线或股道占用")
+                warn("track_direction", "方向未定，保留原始到发点，不猜测上下到发边界")
+                if passing:
+                    pass_through(train, event, resource, ai, di, warn)
                 continue
             half = (len(tracks) + 1) / 2
             offsets = {
@@ -145,6 +197,9 @@ def expand_track_usage(series, resources, requested, yita):
                 index = point_ids.get((event["id"], field))
                 if index is not None:
                     points[index]["track_offset"] = offset
+            if passing:
+                pass_through(train, event, resource, ai, di, warn)
+                continue
             track = event["track_code"]
             if track is None:
                 if 1 not in tracks:
@@ -165,10 +220,6 @@ def expand_track_usage(series, resources, requested, yita):
                 )
                 continue
             usage["adopted_track"] = track
-            ai, di = (
-                point_ids.get((event["id"], "arrival")),
-                point_ids.get((event["id"], "departure")),
-            )
             start = points[ai]["seconds"] + track * yita if ai is not None else None
             end = points[di]["seconds"] - track * yita if di is not None else None
             usage.update(start_seconds=start, end_seconds=end)

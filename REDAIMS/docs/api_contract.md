@@ -140,7 +140,7 @@ revision必须匹配最新对象/归属/有效BaseTT上下文，否则409。chan
 
 POST /diagram/data请求新增expanded_stations（可选，默认[]，最多500个本站稳定node_id）。不属于当前有效线路的节点422；资料无效的车站不展开，返回警告并记录日志，其余基础运行图可继续显示。新增响应track_stations（每站line_ind、节点身份、can_expand、track_count、tracks[{number,roles}]、directions{down/up:{stop_tracks,main_track}}、issues），expanded_stations为实际成功展开的节点ID。资源只来自当前有效BaseTT对应线路成员，重复/缺失不借用其他线路。
 
-展开系列沿用真实到发点并附track_offset（以股道间距为单位的屏幕竖直偏移，与站轴逆序无关），计算进路点新增calculated=true、usage_kind=track_entry/track_exit；field仍指原arrival/departure。segments.kind新增track_enter、track_occupancy、track_leave，移除被展开事件原合并dwell段。event.track_usage返回direction、original_track、adopted_track、defaulted、start_seconds、end_seconds、can_occupy，原track_code与arrival/departure不变。由真实k与系数计算A+k×yita、D−k×yita；倒置不画伪有效占用，缺时刻仅保留可确定部分，零长占用保留。空_G默认1仅限真实集合有1并警告，不回写。
+展开系列沿用真实到发点并附track_offset（以股道间距为单位的屏幕竖直偏移，与站轴逆序无关），计算进路点新增calculated=true、usage_kind=track_entry/track_exit/pass_track/track_unassigned；field仍指原arrival/departure。segments.kind新增track_enter、track_occupancy、track_leave、track_pass，移除被展开事件原合并dwell段。event.track_usage返回direction、passing、original_track、adopted_track、defaulted、start_seconds、end_seconds、can_occupy，原track_code与arrival/departure不变。停站列车由真实k与系数计算A+k×yita、D−k×yita；倒置不画伪有效占用，缺时刻仅保留可确定部分，零长占用保留。停站列车空_G默认1仅限真实集合有1并警告，不回写。通过事件passing=true（到发同秒），使用track_pass连接原始到发点，并增加一个pass_track点标记实际股道；其start_seconds=end_seconds=通过秒，can_occupy=true。未指定/不能定位股道时改用track_unassigned红色三角形，位置为所选线路上下行正线位置中点，adopted_track=null、can_occupy=false，不回写源数据；共用/单方向正线使用该正线位置，无正线时在展开区中心并返回track_main_missing警告。
 
 styles新增track_gap（默认1，范围0.5—12，单位5px）和track_yita_seconds（默认1，范围0—3600秒）。前端修改间距只重排显示空间，修改进路系数重新请求几何并保留视窗；均不改变基础axis/axis_revision或正式数据。日志保留原值、采用值、公式时刻、列车实例、节点/线路及来源。
 
