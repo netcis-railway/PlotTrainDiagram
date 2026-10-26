@@ -57,6 +57,24 @@ config.yaml配置数据库、受管源文件、暂存和日志目录；相对路
 
 ## 启动前端（另一个终端）
 
+## 安装Node.js
+第一运行前端时，需要先安装Node.js 22
+
+### 在Linux安装
+需要 sudo，运行一下命令安装
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+装完确认：
+```bash
+node --version
+npm --version
+```
+
+### Windows下启动前端
+
+
 ```powershell
 cd D:\mynetcis-railway\PlotTrainDiagram\REDAMS\frontend
 & "C:\Program Files\nodejs\npm.cmd" install
