@@ -3,7 +3,8 @@
 % 作    者：wurui
 % 时间：2026年01月25日
 
-%% 代码功能描述
+% 2026年03月11日：
+% 调整上下行逻辑，修改一些错误，增加异常处理; 对DrawDigram新增输入参数color，以便绘制对比图
 % 本文件提供基于V3f版Excel列车时刻表绘制列车运行图的函数接口。
 % 程序读取车站及列车到发时刻、线路信息和Seq顺序信息，识别列车运行方向，
 % 计算各相邻车站间的等效间距，并绘制指定线路的运行图背景、列车运行线及车次标注。
@@ -26,6 +27,9 @@
 % 绘制背景坐标 -> 绘制线路运行线 -> 标注车次。详细参数及返回值见各子程序注释。
 
 %% 接口函数：DrawTrainDigramFunction_v3f
+% 2026年4月3日
+% 修改了适配后缀_A和_a的两种形式
+% 新增函数HighlightTrainLines，作用是输入一个车次号字符串，车次号间以逗号隔开，高亮这些车的运行线，让DrawLineDigram返回对应的句柄和车次名，之后在HighlightTrainLines中用
 %  接口名称：DrawTrainDigram
 %  描    述：绘制列车运行图的所有函数的接口函数
 function DrawTrainDigram = DrawTrainDigramFunctionV3f
@@ -52,6 +56,13 @@ function DrawTrainDigram = DrawTrainDigramFunctionV3f
     
     %标记所有列车车次编号
     DrawTrainDigram.MarkTrainNumber = @MarkTrainNumber;
+    % 根据指定车次号字符串对对应运行线做高亮处理
+    DrawTrainDigram.HighlightTrainLines = @HighlightTrainLines;
+    % 将输出excel时的以秒为单位的时间转换回日期时间格式
+    DrawTrainDigram.RAWtoDateTime = @RAWtoDateTime;
+    % 根据时间区间和车站区间重构v3f时刻表
+    DrawTrainDigram.RebuildV3fByScope = @RebuildV3fByScope;
+
 
     %根据基本图和调度图绘制对比运行图
     DrawTrainDigram.DrawLineDigramBasevsRescheduled = @DrawLineDigramBasevsRescheduled;
@@ -191,7 +202,7 @@ function [minTravelTime] = GetStationInterval(RAW, trainNum, stationNum, Directi
                 end
 
             % 如果是上行列车
-            elseif DirectionSign(j) == 1
+            elseif DirectionSign(j) == 2 %lirenlong 修改从1改为2
                 dep = RAW{i+2, baseCol+1};   % i+1站发车时间（第一行表头）
                 arr = RAW{i+1, baseCol};     % i站到达时间
 
@@ -339,7 +350,11 @@ function [ StationPosition ] = DrawBackground(RAW, startHour, endHour, stationNu
         AxisYStr{k} = RAW{i+1,5};
     end
 
-    set(gca,'YLim',[0,StationPosition(end)]);
+    if length(StationPosition) < 2 %仁龙修改
+        set(gca,'YLim',[0,1]);   % 防止崩溃
+    else
+        set(gca,'YLim',[0,StationPosition(end)]);
+    end
     set(gca,'YTick',StationPosition);
     set(gca,'YTickLabel',AxisYStr);
     set(gca,'YDir','reverse');
@@ -352,6 +367,10 @@ end
 %  输出参数：无
 %  调用函数：无
 function [ ] = DrawDigram(RAW, trainNum, stationNum, DirectionSign, StationPosition)
+    % 绘制列车运行轨迹（按上下行区分颜色）
+    % 输入：trainNum-列车数, stationNum-站点数, DirectionSign-上下行标识, StationPosition-站点Y坐标, RAW-原始元胞数据
+    % 输出：无（绘图）
+
     hold on;
     colorMap = {'r', 'b'};   % 1=下行(红)，2=上行(蓝)
 
@@ -580,7 +599,7 @@ function [StationPosition] = DrawLineDigramBasevsRescheduled(RAW_base, trainNum_
 
     % ============ (7) 标记车次号（只标注一次） ============
     MarkTrainNumber(RAW_base, trainNum_base, StationPosition, LineID);
-end
+end    
 
 %% 函数名称：MarkTrainNumber
 %  描    述：标记列车车次
@@ -660,6 +679,272 @@ function [ ] = MarkTrainNumber(RAW, trainNum, StationPosition, LineID)
                 text(x, y, name, 'FontSize', 15);
             end
         end
+
+
+%% 函数名称：HighlightTrainLines
+%  描    述：根据指定车次号字符串targetStr高亮对应运行线
+%  输入参数：LineHandle, trainName, targetStr
+%  输出参数：
+%  调用函数：
+function [ ] = HighlightTrainLines(LineHandle, trainName, targetStr)
+    % 解析字符串，以,进行分隔
+    targetList = strsplit(targetStr, ',');
+    targetList = strtrim(targetList);
+
+    % 遍历所有列车
+    for i = 1:length(trainName)
+        % 若解析出的车次号为当前遍历车次号
+        if any(strcmp(trainName{i}, targetList))
+            % 修改图形属性
+            if isgraphics(LineHandle{i})
+                % 线宽3.0，颜色为黑色
+                set(LineHandle{i}, ...
+                    'Color', 'k', ...
+                    'LineWidth', 3.0);
+            end
+        end
+    end
+end
+
+%% 函数名称：RebuildV3fByScope
+%  描    述：根据用户输入的起止时间和起止车站重构v3f时刻表，仅保留区间内出现的车辆信息
+%  输入参数：
+%      RAW: v3f格式元胞数据
+%      trainNum: 车辆数量（可传空[]，函数内部自动计算）
+%      startTimeInput: 起始时间，支持''/char/string/datetime/Excel序列值
+%      endTimeInput:   结束时间，支持''/char/string/datetime/Excel序列值
+%      startStationInput: 起始车站，支持''/NODE_CODE/NODE_NAME/NODE_ID(数值或字符串)
+%      endStationInput:   结束车站，支持''/NODE_CODE/NODE_NAME/NODE_ID(数值或字符串)
+%  输出参数：
+%      RAW_filtered: 重构后的v3f时刻表（时间仍为Excel序列值）
+%      RAW_filtered_date: 重构后的v3f时刻表（到发时间为datetime）
+%      trainNum_filtered: 重构后车辆数
+%      stationNum_filtered: 重构后车站数
+function [RAW_filtered, RAW_filtered_date, trainNum_filtered, stationNum_filtered] = ...
+    RebuildV3fByScope(RAW, trainNum, startTimeInput, endTimeInput, startStationInput, endStationInput)
+
+    [rawRow, rawCol] = size(RAW);
+    stationNum = rawRow - 1;
+
+    if nargin < 2 || isempty(trainNum)
+        trainNum = floor((rawCol - 5) / 4);
+    end
+
+    % ---------- 计算车站区间 ----------
+    startStationIdx = 1;
+    endStationIdx = stationNum;
+
+    if ~(ischar(startStationInput) && isempty(startStationInput)) && ...
+       ~(isstring(startStationInput) && strlength(startStationInput)==0) && ...
+       ~isempty(startStationInput)
+        startStationIdx = locateStationIndex(RAW, stationNum, startStationInput);
+    end
+
+    if ~(ischar(endStationInput) && isempty(endStationInput)) && ...
+       ~(isstring(endStationInput) && strlength(endStationInput)==0) && ...
+       ~isempty(endStationInput)
+        endStationIdx = locateStationIndex(RAW, stationNum, endStationInput);
+    end
+
+    if startStationIdx > endStationIdx
+        temp = startStationIdx;
+        startStationIdx = endStationIdx;
+        endStationIdx = temp;
+    end
+
+    selectedStationRows = (startStationIdx + 1):(endStationIdx + 1); % +1跳过表头
+
+    % ---------- 获取全表时间边界 ----------
+    allTimes = [];
+    for i = 1:trainNum
+        baseCol = 6 + (i - 1) * 4;
+        for r = 2:stationNum+1
+            arr = RAW{r, baseCol};
+            dep = RAW{r, baseCol + 1};
+
+            if isnumeric(arr) && ~isnan(arr)
+                allTimes(end+1) = arr; %#ok<AGROW>
+            end
+            if isnumeric(dep) && ~isnan(dep)
+                allTimes(end+1) = dep; %#ok<AGROW>
+            end
+        end
+    end
+
+    if isempty(allTimes)
+        error('RebuildV3fByScope:NoValidTime', '原始时刻表中未找到有效到发时间。');
+    end
+
+    minTime = min(allTimes);
+    maxTime = max(allTimes);
+
+    % ---------- 解析用户输入时间（统一转换为当天秒数比较） ----------
+    startSec = parseTimeInputToSecondOfDay(startTimeInput, excelSerialToSecondOfDay(minTime));
+    endSec = parseTimeInputToSecondOfDay(endTimeInput, excelSerialToSecondOfDay(maxTime));
+
+    % ---------- 选车：车站区间内有任一到发时间落入时间区间则保留 ----------
+    selectedTrainIdx = [];
+    for i = 1:trainNum
+        baseCol = 6 + (i - 1) * 4;
+        keepThisTrain = false;
+
+        for r = selectedStationRows
+            arr = RAW{r, baseCol};
+            dep = RAW{r, baseCol + 1};
+
+            arrValid = false;
+            depValid = false;
+
+            if isnumeric(arr) && ~isnan(arr)
+                arrSec = excelSerialToSecondOfDay(arr);
+                arrValid = isSecondInWindow(arrSec, startSec, endSec);
+            end
+            if isnumeric(dep) && ~isnan(dep)
+                depSec = excelSerialToSecondOfDay(dep);
+                depValid = isSecondInWindow(depSec, startSec, endSec);
+            end
+
+            if arrValid || depValid
+                keepThisTrain = true;
+                break;
+            end
+        end
+
+        if keepThisTrain
+            selectedTrainIdx(end+1) = i; %#ok<AGROW>
+        end
+    end
+
+    % ---------- 重构新v3f ----------
+    trainNum_filtered = length(selectedTrainIdx);
+    stationNum_filtered = length(selectedStationRows);
+    newCol = 5 + 4 * trainNum_filtered;
+
+    RAW_filtered = cell(stationNum_filtered + 1, newCol);
+
+    % 基础信息列
+    RAW_filtered(1,1:5) = RAW(1,1:5);
+    RAW_filtered(2:end,1:5) = RAW(selectedStationRows,1:5);
+
+    % 车辆列（每车4列整体拷贝）
+    for k = 1:trainNum_filtered
+        oldTrainIdx = selectedTrainIdx(k);
+        oldBase = 6 + (oldTrainIdx - 1) * 4;
+        newBase = 6 + (k - 1) * 4;
+
+        RAW_filtered(1,newBase:newBase+3) = RAW(1,oldBase:oldBase+3);
+        RAW_filtered(2:end,newBase:newBase+3) = RAW(selectedStationRows,oldBase:oldBase+3);
+    end
+
+    % 输出日期时间版本（A/D/G列转datetime，SEQ保留数值）
+    RAW_filtered_date = RAWtoDateTime(RAW_filtered);
+end
+
+% 辅助函数：根据车站输入定位车站索引（返回1~stationNum）
+function idx = locateStationIndex(RAW, stationNum, stationInput)
+    idx = [];
+
+    % 优先按NODE_ID匹配
+    if isnumeric(stationInput) && isscalar(stationInput)
+        targetId = stationInput;
+        for i = 1:stationNum
+            curId = RAW{i+1,2};
+            if isnumeric(curId) && isequal(curId, targetId)
+                idx = i;
+                return;
+            end
+        end
+    else
+        stationStr = strtrim(char(string(stationInput)));
+        idNum = str2double(stationStr);
+
+        % stationInput是数字字符串时，尝试按NODE_ID匹配
+        if ~isnan(idNum)
+            for i = 1:stationNum
+                curId = RAW{i+1,2};
+                if isnumeric(curId) && isequal(curId, idNum)
+                    idx = i;
+                    return;
+                end
+            end
+        end
+
+        % 按NODE_CODE匹配
+        for i = 1:stationNum
+            codeVal = RAW{i+1,3};
+            if ischar(codeVal) || isstring(codeVal)
+                if strcmpi(strtrim(char(codeVal)), stationStr)
+                    idx = i;
+                    return;
+                end
+            end
+        end
+
+        % 按NODE_NAME匹配
+        for i = 1:stationNum
+            nameVal = RAW{i+1,5};
+            if ischar(nameVal) || isstring(nameVal)
+                if strcmp(strtrim(char(nameVal)), stationStr)
+                    idx = i;
+                    return;
+                end
+            end
+        end
+    end
+
+    if isempty(idx)
+        error('RebuildV3fByScope:StationNotFound', ...
+            '未找到车站输入：%s。可使用NODE_ID/NODE_CODE/NODE_NAME。', char(string(stationInput)));
+    end
+end
+
+% 辅助函数：将输入时间解析为当天秒数；输入为空时返回默认值
+function secValue = parseTimeInputToSecondOfDay(timeInput, defaultValue)
+    if (ischar(timeInput) && isempty(timeInput)) || ...
+       (isstring(timeInput) && strlength(timeInput)==0) || ...
+       isempty(timeInput)
+        secValue = defaultValue;
+        return;
+    end
+
+    if isnumeric(timeInput) && isscalar(timeInput) && ~isnan(timeInput)
+        % 若传入的是Excel序列值（如2.34）或天内小数（如0.34），统一按时间解析
+        secValue = excelSerialToSecondOfDay(timeInput);
+        return;
+    end
+
+    if isdatetime(timeInput)
+        v = datevec(timeInput);
+        secValue = v(4)*3600 + v(5)*60 + v(6);
+        return;
+    end
+
+    if ischar(timeInput) || isstring(timeInput)
+        s = char(timeInput);
+        v = datevec(s); % 支持 'yyyy/MM/dd HH:mm:ss' 或仅 'HH:mm:ss'
+        secValue = v(4)*3600 + v(5)*60 + v(6);
+        return;
+    end
+
+    error('RebuildV3fByScope:InvalidTimeInput', '无法识别的时间输入类型。');
+end
+
+% 辅助函数：Excel序列值转当天秒数
+function secValue = excelSerialToSecondOfDay(excelSerial)
+    v = datevec(excelSerial);
+    secValue = v(4)*3600 + v(5)*60 + v(6);
+end
+
+% 辅助函数：判断某个秒值是否位于时间窗内（支持跨午夜）
+function flag = isSecondInWindow(targetSec, startSec, endSec)
+    if startSec <= endSec
+        flag = (targetSec >= startSec) && (targetSec <= endSec);
+    else
+        % 例如 23:00 到 02:00
+        flag = (targetSec >= startSec) || (targetSec <= endSec);
+    end
+end
+
 
 %% 函数名称：parseTime
 %  描    述：时间转换函数，将RAW中时间转换为秒
@@ -754,6 +1039,41 @@ function flag = IsStationOnLine(LineInfo, LineID)
     % 判断两列表是否有交集
     if ~isempty(intersect(InfoList, IdList))
         flag = true;
+    end
+end
+%% 函数名称：RAWtoDateTime
+%  描    述：由于输出excel时会自动转换成秒，需要转换为原始日期时间格式
+%  输入参数：根据v3转换成v3f后的RAW
+function RAW_date = RAWtoDateTime(RAW)
+    % 完整复制原始RAW
+    RAW_date = RAW;
+    [row, col] = size(RAW);
+
+    % 遍历所有列（从第6列开始）
+    for j = 6:col
+        header = RAW{1,j};
+
+        if ischar(header) || isstring(header)
+            header_str = char(header);
+            % 只处理 _A/a _D/d _G/g 结尾
+            if endsWith(header_str, '_A') || ...
+               endsWith(header_str, '_D') || ...
+               endsWith(header_str, '_G') || ...
+               endsWith(header_str, '_a') || ...
+               endsWith(header_str, '_d') || ...
+               endsWith(header_str, '_g')
+
+                for i = 2:row
+                    val = RAW{i,j};
+
+                    if isnumeric(val) && ~isnan(val)
+                        dt = datetime(val, 'ConvertFrom', 'excel');
+                        dt.Format = 'yyyy/MM/dd HH:mm:ss';
+                        RAW_date{i,j} = dt;
+                    end
+                end
+            end
+        end
     end
 end
 
