@@ -46,7 +46,7 @@ NODE_INFO的DB_TRACKS/UB_TRACKS支持 `[10,11,12]`（无正线）或 `[5,6,7]/6`
 ## 启动后端（项目根目录，PowerShell）
 
 ```powershell
-cd D:\mynetcis-railway\PlotTrainDiagram\REDAMS
+cd D:\mynetcis-railway\PlotTrainDiagram\REDAIMS
 python -m pip install -e ".[dev]"
 python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
 ```
@@ -57,16 +57,23 @@ config.yaml配置数据库、受管源文件、暂存和日志目录；相对路
 
 ## 启动前端（另一个终端）
 
+必须在frontend目录下启动才能工作
+
 ## 安装Node.js
+
 第一运行前端时，需要先安装Node.js 22
 
 ### 在Linux安装
+
 需要 sudo，运行一下命令安装
+
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
+
 装完确认：
+
 ```bash
 node --version
 npm --version
@@ -74,16 +81,37 @@ npm --version
 
 ### Windows下启动前端
 
-
 ```powershell
-cd D:\mynetcis-railway\PlotTrainDiagram\REDAMS\frontend
+cd D:\mynetcis-railway\PlotTrainDiagram\REDAIMS\frontend
 & "C:\Program Files\nodejs\npm.cmd" install
 & "C:\Program Files\nodejs\npm.cmd" run dev -- --configLoader runner
 ```
 
 已有依赖时跳过install；锁文件复现可使用npm ci。打开终端显示地址，默认 [http://127.0.0.1:5173](http://127.0.0.1:5173)。开发代理将/api转发到127.0.0.1:8000；后端更换端口需同步vite.config.ts。
 
+命令行参数说明
+
+（1）`--port 10973 --strictPort` 在 vite.config.ts 里已配置，可省略；
+
+（2）`--configLoader runner` 对 Vite 6.4.5 无意义，可去掉。
+
 首次打开显示登录页，无需密码，点击登录进入。同页签刷新保留会话；退出返回登录页并清除会话，不删除后端数据。主题保存在本机浏览器。
+
+
+### 配置文件（可手工编辑）
+
+#### 时刻表导入配置：
+
+已将 run 导入表单的默认运行基准日改为  **2025 年 4 月 8 日** 。以后可在 import-defaults.json 中设置：
+
+```
+{
+  "runDateBase": "2025-04-08"
+}
+```
+
+日期使用 `YYYY-MM-DD` 格式。修改后，开发模式重启前端并刷新页面；正式部署需重新构建前端。
+
 
 ## 新模型导入与分类管理流程
 
@@ -110,7 +138,7 @@ python -m ruff format --check backend
 测试使用临时数据库与受管文件目录，不污染正式数据。前端目录运行npm run build进行类型检查和构建。当前代理环境默认dist/.vite-temp创建受限，验证使用：
 
 ```powershell
-npm run build -- --configLoader runner --outDir "$env:TEMP/redams-build-check"
+npm run build -- --configLoader runner --outDir "$env:TEMP/redaims-build-check"
 ```
 
 开发状态见docs/development_status.md，剩余业务事项见planAI/代码开发待定事项.md。显式旧图迁移前会备份数据库和受管源文件；一般编辑/覆盖不自动备份，历史归档与通用备份仍待实现。
@@ -135,6 +163,14 @@ npm run build -- --configLoader runner --outDir "$env:TEMP/redams-build-check"
 
 基本图/run预检缺少_G列时按车次报错，可直接在预检结果打开“修复股道信息”，按列车、线路、UB/DB勾选并自动补列和分配，随后重新预检。共用时刻表编辑器也支持生成股道草稿，再校验保存。详细规则、占用区间边界与限制见[股道修复指南](docs/track_repair_guide.md)。
 
+## 2026-10-27：缺失股道与既有冲突分别处理
+
+修复窗口使用“保存/取消”，取消关闭窗口且不应用结果。默认仅补缺失股道，已有分配只检查并告警；开启“修复有冲突的股道分配”后，按窗口列车顺序保留先出现列车，逐个尝试修复后续已选冲突访问。容量不足等分配问题告警，保留失败访问，其余成功结果可继续保存。详见[股道修复指南](docs/track_repair_guide.md)。
+
+## 2026-10-27：股道修复方向互斥与资料未知告警
+
+修复股道时，同一列车同一线路下UB/DB二选一，选择一个自动取消另一个；仍可选择多条线路。所选线路/方向股道资料未知改为告警：跳过无法定位的访问并保留原股道，继续生成其余可修复结果；保留的有效占用仍参与避让。编辑草稿、导入重预检及告警提示已同步，容量不足等分配问题告警并保留失败访问，结构及必要时刻校验独立保留。详见[股道修复指南](docs/track_repair_guide.md)。
+
 ## 2026-10-26：小时线与多列车时刻对比
 
 运行图整点小时线改为绿色2px实线加粗，独立于缩放后的分钟刻度。所选列车明细改为全部已选列车按车站对齐、分组并排显示，支持Ctrl增选和明细复选；基本图/run同车次分别列出，同站重复访问、原SEQ、空时刻和跨日日期均保留。点击“明细”加入当前对比并保留已有选择。
@@ -146,3 +182,10 @@ npm run build -- --configLoader runner --outDir "$env:TEMP/redams-build-check"
 ## 2026-10-26：SEQ缺列修复与整车平移
 
 新增“修复SEQ信息”：缺列按车次报错、按有到发时刻的源行从1连续补号、自动重新预检；已有SEQ保留。同时缺G/SEQ先补SEQ再补G。共用时刻表新增“整车时间平移”，支持多列车、正负整数分钟/秒、完整运行线含隐藏站、草稿校验保存。 详见[SEQ修复](docs/sequence_repair_guide.md)与[整车平移](docs/time_shift_guide.md)。
+
+
+## run运行图保存视图（2026-10-27）
+
+运行图窗口新增“保存当前视图”，可命名保存线路、车站、基本图/run列车、显示范围、高亮、多车明细和绘图高度；分类树在所属run下显示“视图”子节点，点击即可回看。状态与绘图快照持久保存，保留保存时的原图；后续编辑不改变旧视图，保存草稿预览也不提交时刻表。更新代码后重启后端、刷新前端。详见[运行图指南](docs/train_diagram_guide.md)。
+
+run下支持视图、求解日志、延误分析三类子节点，统一页面以三个可折叠小节展示并保存工作区状态。TXT日志文本查看/搜索和可视化接入点、到发延误矩阵/曲线及保存快照已接入，详见[run分析指南](docs/run_analysis_guide.md)。

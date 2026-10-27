@@ -31,7 +31,7 @@ async function inspect() {
 async function repaired(repairedFile: File, warnings: number) {
   repairOpen.value = false; sequenceOpen.value = false
   file.value = repairedFile
-  repairStatus.value = `已使用修复后的 ${repairedFile.name} 重新预检。${warnings ? `有 ${warnings} 条未选列车股道缺失或无效，其占用尚不能核查。` : ''}`
+  repairStatus.value = `已使用修复后的 ${repairedFile.name} 重新预检。${warnings ? `有 ${warnings} 条股道修复告警，请核对资料未知的访问、未修复股道及无法核查的占用。` : ''}`
   await inspect()
 }
 async function commit() {

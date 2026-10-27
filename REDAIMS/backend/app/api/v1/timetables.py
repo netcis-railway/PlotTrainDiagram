@@ -3,6 +3,7 @@ from functools import wraps
 from typing import Annotated, Literal
 from urllib.parse import quote
 
+from app.analysis.delays import read_delays
 from app.base_timetables.editing import EditorService, EditRequest, SaveRequest
 from app.base_timetables.exporting import ExportService
 from app.base_timetables.migration import MigrationService
@@ -95,6 +96,11 @@ def router(service, settings):
                 "X-Repair-Warnings": str(len(result["warnings"])),
             },
         )
+
+    @api.get("/runs/{run_id}/delay-analysis")
+    @guarded
+    def delay_analysis(run_id: str):
+        return read_delays(editor, run_id)
 
     @api.get("/diagram/lines")
     @guarded

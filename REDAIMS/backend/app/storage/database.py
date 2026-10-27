@@ -51,4 +51,41 @@ class Database:
                 )
             """)
 
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS run_solver_logs (
+                    id VARCHAR PRIMARY KEY,
+                    run_id VARCHAR NOT NULL,
+                    filename VARCHAR NOT NULL,
+                    size_bytes BIGINT NOT NULL,
+                    digest VARCHAR NOT NULL,
+                    content BLOB NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
+                    UNIQUE (run_id, filename, digest)
+                )
+            """)
+
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS run_diagram_views (
+                    id VARCHAR PRIMARY KEY,
+                    run_id VARCHAR NOT NULL,
+                    name VARCHAR NOT NULL,
+                    state JSON NOT NULL,
+                    snapshot JSON NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
+                    UNIQUE (run_id, name)
+                )
+            """)
+
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS run_analysis_nodes (
+                    id VARCHAR PRIMARY KEY,
+                    run_id VARCHAR NOT NULL,
+                    node_type VARCHAR NOT NULL,
+                    name VARCHAR NOT NULL,
+                    state JSON NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
+                    UNIQUE (run_id, node_type, name)
+                )
+            """)
+
             initialize(connection)

@@ -167,7 +167,7 @@ styles新增track_gap（默认1，范围0.5—12，单位5px）和track_yita_sec
 | GET | /ingest/jobs/{job_id}/track-repair/context | 同时支持base_tt_jobs和普通run的import_jobs未提交预检，返回同一修复上下文；不要求原预检通过 |
 | POST | /ingest/jobs/{job_id}/track-repair/apply | repair_token及selections；成功返回XLSX二进制副本与X-Repair-Warnings计数，客户端以副本重新预检；分配失败返回JSON can_apply=false、空changes及issues |
 
-selections为[{train_id, lines:[{line_ind, directions:["UB","DB"]}]}]，只列勾选的列车和线路；每车至少一线路，每线路至少一方向，未知/重复列车或线路拒绝。上下文变化返回409；其他不可修复的结构/时刻问题返回422。失败结果不应用部分分配。只补选中列车的_G，其他缺列保持阻断。
+selections为[{train_id, lines:[{line_ind, directions:["UB"]}]}]，只列勾选的列车和线路；每车至少一线路，每线路必须且仅能有一个方向（["UB"]或["DB"]），双方向/重复方向/空方向返回422；未知/重复列车或线路拒绝。上下文变化返回409；其他不可修复的结构/时刻问题返回422。结构/必要时刻等阻断错误不应用修改；容量不足等分配问题进入warnings并保留成功的部分；所选线路/方向股道资料未知则进入warnings，有其他已知候选时继续使用，无候选时跳过该访问并保留原股道。跳过访问有效的既有占用参与避让，changes仅包含可修复访问；仅有告警时can_apply=true（changes可为空）。只补选中列车的_G，其他缺列保持阻断。
 
 分配范围、占用时间边界、未知数据及搜索限额详见[股道修复指南](track_repair_guide.md)。不新增数据库字段，不改变既有保存确认机制。
 
@@ -186,3 +186,52 @@ SEQ只按源行A/D有值从1补新列，已有列保留；不会绕过全局SEQ�
 
 
 2026-10-26更正：股道修复context的direction默认为奇数DB（下行）、偶数UB（上行），带/仅看首个车次。表头整列取消在前端清除全部行的线路与方向，selections排除该线路；重新勾选恢复默认方向。不改变请求模型或52条路径。
+
+
+## 2026-10-27：只补缺失股道与可选既有冲突修复
+
+两类股道修复apply请求增加可选repair_conflicts:boolean，默认false。默认只对所选列车缺少股道的访问生成changes；非空股道保留。context新增warnings（既有冲突/无法核查占用）和每车conflict_count，顺序与窗口列车列表一致。前端开启选项后自动选中涉及冲突的列车，最终修改范围仍受selections限制。
+
+repair_conflicts=true时，按context列车顺序保留先出现的既有占用，对仍冲突的后续已选访问逐个尝试重分配，并保护其他全部已有占用。容量不足、已知无资源和未知资源均返回warnings，保留失败访问，can_apply仍可为true且返回其余成功changes；无法修复时changes可为空。缺失访问的非法时刻等阻断校验仍返回can_apply=false且不应用修改。接口均只生成结果，业务持久化继续由原编辑/导入提交完成。原有X-Repair-Warnings计数保留。取消操作中止客户端保存请求并忽略延迟结果，不发送业务保存请求。
+
+
+## run 求解日志附件（2026-10-27）
+
+- `GET /api/v1/runs/{run_id}/solver-logs`：按导入时间倒序返回附件元数据列表。
+- `POST /api/v1/runs/{run_id}/solver-logs?filename=文件名`：请求体为原始二进制文件（application/octet-stream），成功返回 201 和附件元数据。非空、最大 32 MB；同一 run 下相同文件名及 SHA-256 内容返回已有附件。路径形式的文件名只保留末段。
+- `GET /api/v1/runs/{run_id}/solver-logs/{log_id}/download`：以附件下载原始内容，提供 UTF-8 文件名和 nosniff 响应头。
+
+元数据字段：id、run_id、filename、size_bytes、digest（SHA-256）、created_at。不存在的 run、旧版 role=base 对象、其他 run 的附件或不存在的附件返回 404；空文件/无效文件名返回 422，超限返回 413。
+
+接口只附加日志，不解析求解指标、不修改时刻表、基础设施、分类或时刻表修订号。日志跟随 run 转移或取消分组，随 run 删除。
+
+
+## run 运行图保存视图（2026-10-27）
+
+- GET /api/v1/diagram/views：分类树使用的全部普通run视图摘要，排除旧版role=base对象，不返回快照。
+- GET /api/v1/runs/{run_id}/diagram-views：当前run的视图摘要列表。
+- POST /api/v1/runs/{run_id}/diagram-views：提交name、state、snapshot，成功201，返回视图摘要；不会修改时刻表或修订号。
+- GET /api/v1/runs/{run_id}/diagram-views/{view_id}：按run及视图ID读取完整保存状态及快照，不读取当前时刻表重新绘图。
+
+摘要为id、run_id、name、created_at、line_ind、station_count、train_count、highlight_count。state.version=1，包含line_ind、overlay_base、reverse、station_ids、train_keys、highlighted_keys、expanded_station_ids、track_station、viewport（x0/x1/y0/y1）、from_time、to_time、detail_open和chart_height（340—4000px）。
+
+snapshot.context与snapshot.data分别采用保存时的PlotContext和PlotData；data.series只保留显示或高亮的系列，系列key包含对象类型、对象及列车身份，以区分同车次的基本图和run。快照与状态以同一事务写入，JSON合计最多32 MB。run/线路、车站、系列及基本图归属必须与快照一致，范围须有限且递增。
+
+同一run下同名返回409；无效状态/快照返回422；超限返回413；读取不存在或属于其他run的视图返回404。快照保存后独立于后续数据编辑/基本图绑定变化；run移动/取消分组保留，删除run时同步删除。详见运行图指南及OpenAPI。
+
+## run统一分析节点（2026-10-27）
+
+| 方法/路径 | 行为 |
+| --- | --- |
+| GET /api/v1/analysis/nodes | 所有普通run的分析节点摘要，不含快照 |
+| POST /api/v1/runs/{run_id}/analysis-nodes | 创建view、solver-log或delay节点，201 |
+| GET /api/v1/runs/{run_id}/analysis-nodes/{node_id} | 读取完整工作区配置与快照 |
+| GET /api/v1/analysis/logs | 日志附件摘要，供分类树直接显示TXT子节点 |
+| GET /api/v1/runs/{run_id}/solver-logs/{log_id}/text?encoding=utf-8 | 严格解码日志文本；另支持gb18030 |
+| GET /api/v1/runs/{run_id}/delay-analysis | 按当前有效基本图计算已保存run的到发延误秒数 |
+
+保存请求：node_type（view/solver-log/delay）、name、state。state.version=1，含expanded_sections（diagram/log/delay，可同时或全折叠）、可空diagram（现有CreateDiagramView）、log配置、可空delay（state+snapshot）。主类型view须有可绘图快照，solver-log须有本run日志，delay须有本run延误快照。整个已加载工作区一起保存；未来日志可视化的JSON参数放入log.visualization_state。所有名称去首尾空白，同run/类型重名409；状态或快照非法422，正文合计超32MB为413，不存在run/跨run读取404。保存不更新时刻表。
+
+日志文本返回id/filename/digest/encoding/text，原始文件仍由download接口提供。无法按指定编码解码422，支持UTF-8 BOM和GB18030/GBK。延误返回object/base/revision/stations/trains/rows/cells/issues/method，cells到发值为带正负的秒数或null，并附逐字段reason；缺失值不按0计。具体口径见[统一分析指南](run_analysis_guide.md)。旧diagram-views API保留兼容。
+
+运行图series补充可空run_no：普通run为所属方案的数字编号，基本图为null，用于前端绘图列车选项的同车次方案排序。旧绘图快照继续兼容，前端可从同一对象的snapshot.data.object.run_no补足。

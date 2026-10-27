@@ -246,6 +246,9 @@ class CatalogService:
                         "source_files",
                         "base_run_data",
                         "run_working_data",
+                        "run_solver_logs",
+                        "run_diagram_views",
+                        "run_analysis_nodes",
                     ):
                         connection.execute(f"DELETE FROM {table} WHERE run_id=?", [row[0]])
                     connection.execute("DELETE FROM base_bindings WHERE scope_id=?", [row[0]])

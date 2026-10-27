@@ -12,7 +12,7 @@ from app.ingest.issues import node_context
 from app.storage.database import Database
 from pydantic import BaseModel, ConfigDict, Field
 
-logger = logging.getLogger("redams.ingest")
+logger = logging.getLogger("redaims.ingest")
 
 
 def encode(value):

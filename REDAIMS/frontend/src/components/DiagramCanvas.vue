@@ -3,9 +3,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PlotData, PlotSeries, PlotPoint, PlotSegment } from '../api/diagram'
 import { createTrackLayout, projectOnTracks, trackExtraHeight, visibleTrackStations, wheelViewport, type TrackLayout } from '../trackLayout'
 import { clipSegment, panViewport, project, spacedLabels, tickStep, timeLabel, localTime, zoomViewport, type Bounds, type Viewport } from '../diagramGeometry'
-const props = defineProps<{ data: PlotData; series: PlotSeries[]; stationIds: string[]; selected: string[]; reverse: boolean; viewport: Viewport }>()
-const emit = defineEmits<{ 'update:viewport': [value: Viewport]; select: [key: string, add: boolean]; reset: []; toggleTrack: [id: string] }>()
-const shell = ref<HTMLDivElement | null>(null), canvas = ref<HTMLCanvasElement | null>(null)
+const props = defineProps<{ data: PlotData; series: PlotSeries[]; stationIds: string[]; selected: string[]; reverse: boolean; viewport: Viewport; busy?: boolean; initialHeight?: number }>()
+const emit = defineEmits<{ 'update:viewport': [value: Viewport]; select: [key: string, add: boolean]; reset: []; resetTime: []; resetStation: []; toggleTrack: [id: string] }>()
+const stage = ref<HTMLDivElement | null>(null), shell = ref<HTMLDivElement | null>(null), canvas = ref<HTMLCanvasElement | null>(null)
 interface Hit { series: PlotSeries; point: PlotPoint; segment?: PlotSegment }
 const hover = ref<Hit | null>(null)
 const hoverEvent = computed(() => hover.value?.series.events.find(event => event.id === hover.value?.point.event_id))
@@ -52,7 +52,7 @@ function draw() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'top'
   for (let second = Math.ceil(view.x0 / step) * step; second <= view.x1; second += step) {
     const pixel = project({ seconds: second, y: view.y0 }, view, box, props.reverse)
-    if (second % 3600 !== 0) { ctx.beginPath(); ctx.moveTo(pixel.x, box.top); ctx.lineTo(pixel.x, box.top + box.height); ctx.stroke() }
+    if (second % 1800 !== 0) { ctx.beginPath(); ctx.moveTo(pixel.x, box.top); ctx.lineTo(pixel.x, box.top + box.height); ctx.stroke() }
     ctx.globalAlpha = 1; ctx.fillStyle = css.getPropertyValue('--text').trim(); ctx.fillText(timeLabel(second), pixel.x, box.top + box.height + 10); ctx.globalAlpha = .5
   }
   // Hour lines are independent of the adaptive minor ticks (e.g. a 40-minute step).
@@ -63,7 +63,15 @@ function draw() {
     const pixel = project({ seconds: second, y: view.y0 }, view, box, props.reverse)
     ctx.beginPath(); ctx.moveTo(pixel.x, box.top); ctx.lineTo(pixel.x, box.top + box.height); ctx.stroke()
   }
-  ctx.strokeStyle = styles.grid; ctx.lineWidth = .6; ctx.globalAlpha = .5
+  // Half-hour lines use the same width/color as hours, with a dashed stroke.
+  if (hourStep === 3600) {
+    ctx.setLineDash([8, 5])
+    for (let second = Math.ceil((view.x0 - 1800) / 3600) * 3600 + 1800; second <= view.x1; second += 3600) {
+      const pixel = project({ seconds: second, y: view.y0 }, view, box, props.reverse)
+      ctx.beginPath(); ctx.moveTo(pixel.x, box.top); ctx.lineTo(pixel.x, box.top + box.height); ctx.stroke()
+    }
+  }
+  ctx.setLineDash([]); ctx.strokeStyle = styles.grid; ctx.lineWidth = .6; ctx.globalAlpha = .5
   const axisLabels = stations.filter(station => station.y >= view.y0 && station.y <= view.y1).map(station => ({
     station, pixel: projectOnTracks({ seconds: view.x0, y: station.y }, activeLayout),
   }))
@@ -186,10 +194,11 @@ function hitTest(x: number, y: number): Hit | null {
 }
 function position(event: Pick<MouseEvent, 'clientX' | 'clientY'>) { const rect = canvas.value!.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top } }
 function pointerDown(event: PointerEvent) {
-  if (event.button !== 0) return
+  if (event.button !== 0 || props.busy) return
   const p = position(event); drag = { ...p, originX: p.x, originY: p.y, moved: false }; canvas.value?.setPointerCapture(event.pointerId); hover.value = null
 }
 function pointerMove(event: PointerEvent) {
+  if (props.busy) { drag = null; hover.value = null; return }
   const p = position(event)
   if (drag && event.buttons) {
     const dx = p.x - drag.x, dy = p.y - drag.y
@@ -202,20 +211,22 @@ function pointerMove(event: PointerEvent) {
   hoverFrame = requestAnimationFrame(() => { hoverFrame = 0; hover.value = hitTest(p.x, p.y); hoverPosition.value = { x: Math.min(p.x + 14, Math.max(10, (shell.value?.clientWidth || 600) - 310)), y: Math.max(0, p.y - 140) } })
 }
 function pointerUp(event: PointerEvent) {
-  if (drag && !drag.moved) { const p = position(event), hit = hitTest(p.x, p.y); if (hit) emit('select', hit.series.key, event.ctrlKey || event.metaKey) }
+  if (!props.busy && drag && !drag.moved) { const p = position(event), hit = hitTest(p.x, p.y); if (hit) emit('select', hit.series.key, event.ctrlKey || event.metaKey) }
   drag = null; if (canvas.value?.hasPointerCapture(event.pointerId)) canvas.value.releasePointerCapture(event.pointerId)
 }
 function doubleClick(event: MouseEvent) {
+  if (props.busy) return
   const p = position(event)
   if (p.x > box.left) return
   const nearest = stationHits.slice().sort((a, b) => Math.abs(a.y - p.y) - Math.abs(b.y - p.y))[0]
   if (nearest && Math.abs(nearest.y - p.y) <= Math.max(9, props.data.styles.font_size)) emit('toggleTrack', nearest.id)
 }
 function wheel(event: WheelEvent) {
-  if (!layout || event.deltaY === 0) return
+  if (!layout || event.deltaY === 0 || props.busy) return
   emit('update:viewport', wheelViewport({ ...layout, view: props.viewport }, position(event), event)); hover.value = null
 }
 function keyboard(event: KeyboardEvent) {
+  if (props.busy) return
   const view = props.viewport, dx = (view.x1 - view.x0) * .1, dy = (view.y1 - view.y0) * .1
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home'].includes(event.key)) event.preventDefault(); else return
   if (event.key === 'Home') emit('reset')
@@ -223,11 +234,97 @@ function keyboard(event: KeyboardEvent) {
   else emit('update:viewport', panViewport(view, event.key === 'ArrowLeft' ? -dx : event.key === 'ArrowRight' ? dx : 0, event.key === 'ArrowUp' ? -dy : event.key === 'ArrowDown' ? dy : 0))
   hover.value = null
 }
+const minimumHeight = 340, maximumHeight = 4000
+function defaultHeight() { return Math.max(minimumHeight, Math.min(760, Math.round((window.innerHeight || 800) * .58))) }
+function restoreHeight() {
+  try {
+    const stored = Number(localStorage.getItem('redaims.diagram-height'))
+    if (Number.isFinite(stored) && stored >= minimumHeight && stored <= maximumHeight) return stored
+  } catch { /* Use the default when browser storage is unavailable. */ }
+  return defaultHeight()
+}
+const chartHeight = ref(props.initialHeight != null && Number.isFinite(props.initialHeight) ? Math.max(minimumHeight, Math.min(maximumHeight, props.initialHeight)) : restoreHeight())
+const resizeDrag = ref<{ id: number; y: number; height: number } | null>(null)
+const nativeFullscreen = ref(false), maximized = ref(false), fullscreenBusy = ref(false)
+const isFullscreen = computed(() => nativeFullscreen.value || maximized.value)
+const stageHeight = computed(() => isFullscreen.value ? `max(100dvh, ${minimumHeight + extraHeight.value}px)` : `${chartHeight.value + extraHeight.value}px`)
+defineExpose({ getHeight: () => chartHeight.value })
+let disposed = false, fullscreenTarget: HTMLElement | null = null
+function setHeight(value: number) {
+  chartHeight.value = Math.max(minimumHeight, Math.min(maximumHeight, Math.round(value)))
+  try { localStorage.setItem('redaims.diagram-height', String(chartHeight.value)) } catch { /* Keep the height in memory. */ }
+}
+function startResize(event: PointerEvent) {
+  if (event.button !== 0 || isFullscreen.value) return
+  event.preventDefault()
+  resizeDrag.value = { id: event.pointerId, y: event.clientY, height: chartHeight.value }
+  const handle = event.currentTarget as HTMLElement
+  handle.setPointerCapture(event.pointerId); handle.focus({ preventScroll: true })
+}
+function moveResize(event: PointerEvent) {
+  if (resizeDrag.value?.id === event.pointerId) setHeight(resizeDrag.value.height + event.clientY - resizeDrag.value.y)
+}
+function stopResize(event: PointerEvent) {
+  if (resizeDrag.value?.id !== event.pointerId) return
+  resizeDrag.value = null
+  const handle = event.currentTarget as HTMLElement
+  if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId)
+}
+function resizeKeydown(event: KeyboardEvent) {
+  if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault(); event.stopPropagation()
+  setHeight(event.key === 'Home' ? defaultHeight() : event.key === 'End' ? maximumHeight : chartHeight.value + (event.key === 'ArrowDown' ? 40 : -40))
+}
+function syncFullscreen() { nativeFullscreen.value = !!stage.value && document.fullscreenElement === stage.value }
+async function toggleFullscreen() {
+  if (fullscreenBusy.value || !stage.value) return
+  fullscreenBusy.value = true
+  const target = stage.value
+  try {
+    if (isFullscreen.value) {
+      if (document.fullscreenElement === target) {
+        try { await document.exitFullscreen() } catch { /* Leave Dock available for another attempt. */ }
+      }
+      maximized.value = false; syncFullscreen()
+    } else {
+      fullscreenTarget = target
+      if (target.requestFullscreen) {
+        try {
+          await target.requestFullscreen()
+          if (disposed) {
+            if (document.fullscreenElement === target) await document.exitFullscreen().catch(() => {})
+            return
+          }
+          syncFullscreen()
+        } catch { if (!disposed) maximized.value = true }
+      } else maximized.value = true
+    }
+  } finally { fullscreenBusy.value = false; if (!disposed) queue() }
+}
+function fullscreenKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !isFullscreen.value) return
+  event.preventDefault(); event.stopPropagation(); void toggleFullscreen()
+}
 watch(() => [props.data, props.series, props.stationIds, props.selected, props.reverse, props.viewport], () => { hover.value = null; queue() }, { deep: false })
-onMounted(() => { observer = new ResizeObserver(queue); if (shell.value) observer.observe(shell.value); theme = new MutationObserver(queue); theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); queue() })
-onUnmounted(() => { observer?.disconnect(); theme?.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(hoverFrame) })
+onMounted(() => { document.addEventListener('fullscreenchange', syncFullscreen); observer = new ResizeObserver(queue); if (shell.value) observer.observe(shell.value); theme = new MutationObserver(queue); theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); queue() })
+onUnmounted(() => {
+  disposed = true; document.removeEventListener('fullscreenchange', syncFullscreen)
+  if (fullscreenTarget && document.fullscreenElement === fullscreenTarget) void document.exitFullscreen().catch(() => {})
+  observer?.disconnect(); theme?.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(hoverFrame)
+})
 </script>
-<template><div ref="shell" class="diagram-canvas-shell" :style="{ height: `calc(clamp(340px, 58vh, 760px) + ${extraHeight}px)` }">
+<template><div ref="stage" class="diagram-stage" :class="{ 'diagram-maximized': maximized }" @keydown.capture="fullscreenKeydown">
+  <div class="diagram-floating-tools" role="toolbar" aria-label="运行图显示与自动范围">
+    <button type="button" :disabled="fullscreenBusy" :aria-pressed="isFullscreen" :aria-label="isFullscreen ? '恢复嵌入 Dock 显示' : '全屏显示'" :title="isFullscreen ? '恢复嵌入 Dock 显示' : '全屏显示'" @click="toggleFullscreen">
+      <svg v-if="!isFullscreen" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
+      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1" /><path d="M7 17 17 7M10 7h7v7" transform="rotate(180 12 12)" /></svg>
+    </button>
+    <button type="button" :disabled="busy" aria-label="恢复自动范围" title="Home · 恢复两轴自动范围" @click="emit('reset')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8M5 10v11h14V10M10 21v-7h4v7" /></svg></button>
+    <button type="button" :disabled="busy" aria-label="时间轴恢复自动范围" title="时间轴恢复自动范围（保留车站轴）" @click="emit('resetTime')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M8 8l-4 4 4 4m8-8 4 4-4 4" /></svg></button>
+    <button type="button" :disabled="busy" aria-label="车站轴恢复自动范围" title="车站轴恢复自动范围（保留时间轴）" @click="emit('resetStation')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4" /></svg></button>
+  </div>
+  <div v-if="busy" class="diagram-loading" role="status">正在更新运行图…</div>
+  <div ref="shell" class="diagram-canvas-shell" :style="{ height: stageHeight }">
   <canvas ref="canvas" tabindex="0" role="img" aria-label="列车运行图，横轴为时间，纵轴为车站" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="drag = null" @pointerleave="hover = null" @wheel.prevent="wheel" @keydown="keyboard" @dblclick="doubleClick">运行图可通过下方所选列车时刻明细查阅。</canvas>
   <div v-if="hover && hoverEvent" class="diagram-tooltip" :style="{ left: `${hoverPosition.x}px`, top: `${hoverPosition.y}px` }">
     <div v-if="hover.segment && ['travel','dwell'].includes(hover.segment.kind)">运行线段起点 → {{ hoverEnd?.node_name_chn }}（下列时刻属于起点）</div>
@@ -240,4 +337,10 @@ onUnmounted(() => { observer?.disconnect(); theme?.disconnect(); cancelAnimation
     <div v-if="hoverEvent.track_usage?.adopted_track != null">绘图股道 {{ hoverEvent.track_usage.adopted_track }}{{ hoverEvent.track_usage.defaulted ? '（空值采用1，仅显示）' : '' }}</div>
     <div>列车基准日 {{ hover.series.train_base_date }}</div><div>{{ hoverEvent.source.sheet }} · 源行 {{ hoverEvent.source.row }}</div>
   </div>
+  </div>
+  <div v-if="!isFullscreen" class="diagram-height-handle" role="separator" tabindex="0" aria-label="调整运行图高度" aria-orientation="horizontal"
+    :aria-valuemin="minimumHeight" :aria-valuemax="maximumHeight" :aria-valuenow="chartHeight" :aria-valuetext="`绘图区基础高度 ${chartHeight} 像素`"
+    title="拖动调整运行图高度；上下方向键微调；双击恢复默认高度"
+    @pointerdown="startResize" @pointermove="moveResize" @pointerup="stopResize" @pointercancel="stopResize" @lostpointercapture="resizeDrag = null"
+    @keydown="resizeKeydown" @dblclick="setHeight(defaultHeight())"><span aria-hidden="true">拖动调整高度</span></div>
 </div></template>

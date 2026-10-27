@@ -51,12 +51,13 @@ button.danger { background: #a52c29; } label.confirmation { display: flex; align
 .floating-dot { position: absolute; border-radius: 50%; background: #007bff; opacity: .6; box-shadow: 0 0 10px #007bff; animation: float 6s infinite ease-in-out; }
 @keyframes float { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-20px); opacity: .9; } }
 .login-toolbar { position: absolute; right: 24px; top: 20px; } .theme-toggle { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-.login-brand { text-align: center; margin-bottom: 28px; } .brand-kicker { color: var(--primary); font-size: 10px; letter-spacing: 2px; }
-.login-brand h1 { margin: 14px 0 8px; font-size: clamp(23px, 3.2vw, 38px); } .login-brand > p { color: var(--primary); letter-spacing: 7px; margin: 0; }
+.login-brand { text-align: center; margin-bottom: 28px; } .brand-kicker { color: #174a73; font-size: clamp(12px, 1.1vw, 13px); font-weight: 700; letter-spacing: 2px; line-height: 1.6; }
+:root[data-theme="dark"] .brand-kicker { color: #c1dfff; }
+.login-brand h1 { margin: 14px 0 8px; font-size: clamp(23px, 3.2vw, 38px); } .login-brand > p { color: var(--primary); font-size: clamp(28px, 3vw, 36px); font-weight: 600; line-height: 1.3; letter-spacing: 7px; margin: 0; }
 .login-card { width: 100%; max-width: 410px; border: 1px solid #007bff50; border-radius: 12px; padding: 32px 36px; background: var(--surface); box-shadow: 0 12px 48px #0056b31a; text-align: center; }
 :root[data-theme="dark"] .login-card { background: #141b27dd; backdrop-filter: blur(10px); box-shadow: 0 12px 48px #0005; }
 .login-card form { text-align: left; margin-top: 24px; } .login-card h2 { margin-bottom: 4px; font-size: 25px; } .login-card > p { margin: 4px 0; }
-.login-emblem { width: 48px; height: 48px; margin: 0 auto 18px; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #007bff, #0056b3); display: grid; place-items: center; font-size: 30px; font-weight: 700; }
+.login-emblem { display: block; width: 128px; height: 128px; margin: 0 auto 18px; object-fit: contain; }
 .login-hint { color: var(--muted); font-size: 12px; margin: 0; } .login-button { width: 100%; min-height: 46px; background: linear-gradient(135deg, #007bff, #0056b3); }
 .login-footer { margin-top: 32px; font-size: 12px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .floating-dot { animation: none; } }
@@ -127,8 +128,15 @@ a { color: var(--primary); }
 .catalog-tabs button:focus-visible { outline-offset: -3px; }
 .catalog-editor > article { border-radius: 0 0 9px 9px; border-top: 0; min-height: 320px; }
 .catalog-editor > article:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-.tree-diagram { width: 17px; height: 17px; flex: 0 0 17px; fill: none; stroke: var(--primary); stroke-width: 1.3; }
-.category-tree-row.active .tree-diagram { stroke: #fff; }
+.tree-diagram { width: 17px; height: 17px; flex: 0 0 17px; fill: none; color: var(--primary); stroke: currentColor; stroke-width: 1.3; }
+.category-tree-row.active .tree-diagram { color: #fff; }
+.tree-document-letter { fill: currentColor; stroke: none; font: 700 9.5px Arial, sans-serif; }
+.tree-diagram.tree-analysis-delay { color: #cf443f; }
+.tree-diagram.tree-analysis-log { color: #22864a; }
+[data-theme="dark"] .tree-diagram.tree-analysis-delay { color: #ff9d94; }
+[data-theme="dark"] .tree-diagram.tree-analysis-log { color: #70d99c; }
+.category-tree-row.active .tree-diagram.tree-analysis-delay { color: #ffd7d3; }
+.category-tree-row.active .tree-diagram.tree-analysis-log { color: #c1f4d2; }
 .empty-state { color: var(--muted); padding: 20px 0; }
 .base-info-grid { display: grid; grid-template-columns: 130px minmax(0, 1fr); margin: 18px 0; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
 .base-info-grid dt, .base-info-grid dd { padding: 12px 14px; margin: 0; border-bottom: 1px solid var(--border); line-height: 1.7; overflow-wrap: anywhere; }
@@ -159,6 +167,7 @@ a { color: var(--primary); }
 .checkbox-options { max-height: 230px; overflow-y: auto; margin-top: 12px; }
 .checkbox-options label { display: flex; align-items: center; padding: 5px; }
 .checkbox-options input { width: auto; }
+.diagram-train-options .diagram-train-divider { border-top: 1px solid #2e9f55; }
 .editor-toolbar { padding: 12px 0; border-top: 1px solid var(--border); }
 .editor-grid-fieldset { border: 0; padding: 0; min-width: 0; }
 .editor-table { max-height: 65vh; border: 1px solid var(--border); isolation: isolate; }
@@ -231,3 +240,83 @@ a { color: var(--primary); }
 .track-repair-dialog > p { font-size: 13px; line-height: 1.7; margin: 8px 0; }.track-repair-dialog > h2 { margin: 0 0 12px; }.track-repair-dialog:focus { outline: none; }
 
 .repair-help { margin: 10px 0; font-size: 13px; }.repair-help summary { cursor: pointer; }.repair-help p { line-height: 1.7; }
+
+/* Shared catalog actions and tree context menu. */
+.catalog-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
+.catalog-actions > strong { margin-right: 4px; color: var(--muted); }
+.catalog-actions button { padding: 8px 13px; }
+.catalog-context-menu { position: fixed; z-index: 1000; display: grid; gap: 3px; min-width: 210px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow-y: auto; padding: 6px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 7px; box-shadow: 0 8px 30px #0003; }
+.catalog-context-menu button { text-align: left; padding: 9px 12px; background: transparent; color: var(--text); white-space: normal; }
+.catalog-context-menu button:hover:not(:disabled), .catalog-context-menu button:focus-visible { background: var(--soft); filter: none; outline: 2px solid var(--primary); outline-offset: -2px; }
+.catalog-context-menu button.menu-danger { color: var(--danger); border-top: 1px solid var(--border); border-radius: 0 0 3px 3px; }
+.solver-log-list { padding-left: 20px; }
+.solver-log-list li { padding: 8px 0; overflow-wrap: anywhere; }
+.solver-log-list a { color: var(--primary); }
+.solver-log-list small { display: block; margin-top: 4px; }
+
+/* Track direction batch controls and unavailable route cells. */
+.repair-header-directions { font-weight: normal; }
+.repair-line-unavailable { color: var(--muted); opacity: .55; }
+.repair-line-unavailable label, .repair-line-unavailable input:disabled { cursor: not-allowed; }
+
+/* Keep source coordinates and station names visible in the run import preview. */
+.run-preview-table { --preview-source-width: 72px; isolation: isolate; }
+.run-preview-table table { border-collapse: separate; border-spacing: 0; }
+.run-preview-table th, .run-preview-table td { border-width: 0 1px 1px 0; }
+.run-preview-table thead th { position: sticky; top: 0; z-index: 2; background: var(--soft); }
+.run-preview-table .preview-source { position: sticky; left: 0; width: var(--preview-source-width); min-width: var(--preview-source-width); max-width: var(--preview-source-width); background: var(--soft); }
+.run-preview-table tbody .preview-source { top: auto; z-index: 1; }
+.run-preview-table .preview-station { position: sticky; left: var(--preview-source-width); min-width: 130px; box-shadow: 1px 0 var(--border); }
+.run-preview-table tbody .preview-station { z-index: 1; }
+.run-preview-table tbody .preview-station:not(.validation-error):not(.validation-warning) { background: var(--surface); }
+.run-preview-table thead .preview-source, .run-preview-table thead .preview-station { z-index: 3; }
+
+/* Adjustable diagram surface and floating display/range tools. */
+.diagram-stage { position: relative; width: 100%; margin: 10px 0; background: var(--surface); }
+.diagram-stage .diagram-canvas-shell { margin: 0; }
+.diagram-floating-tools { position: absolute; right: 10px; top: 8px; z-index: 4; display: flex; gap: 4px; padding: 4px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 7px; box-shadow: var(--shadow); }
+.diagram-floating-tools button { display: grid; place-items: center; width: 32px; height: 32px; padding: 5px; color: var(--text); background: var(--soft); }
+.diagram-floating-tools svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.diagram-height-handle { position: absolute; left: 1px; right: 1px; bottom: 1px; height: 16px; display: flex; justify-content: center; align-items: center; color: var(--muted); background: var(--soft); font-size: 10px; line-height: 1; cursor: ns-resize; touch-action: none; user-select: none; }
+.diagram-height-handle:hover, .diagram-height-handle:focus-visible { background: var(--primary); color: #fff; outline: 2px solid var(--primary); outline-offset: 1px; }
+.diagram-height-handle span::before, .diagram-height-handle span::after { content: ''; display: inline-block; width: 28px; border-top: 2px solid currentColor; vertical-align: middle; margin: 0 8px; }
+.diagram-loading { position: absolute; top: 60px; right: 14px; z-index: 3; padding: 8px 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); }
+.diagram-stage:fullscreen, .diagram-stage.diagram-maximized { width: 100vw; height: 100dvh; margin: 0; padding: 0; border: 0; overflow: auto; background: var(--surface); color: var(--text); }
+.diagram-stage.diagram-maximized { position: fixed; inset: 0; z-index: 100; }
+.diagram-stage:fullscreen .diagram-floating-tools, .diagram-stage.diagram-maximized .diagram-floating-tools { position: fixed; }
+
+.diagram-save-view { margin: 12px 0; padding: 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--soft); }
+.diagram-save-view .catalog-actions { margin-bottom: 0; }
+
+.run-analysis { min-width: 0; margin: 18px 0; }
+.run-analysis-dialog { position: fixed; inset: 0; box-sizing: border-box; width: 100vw; max-width: 100vw; max-height: 96dvh; margin: auto 0; padding: 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); overflow: auto; box-shadow: var(--shadow); }
+.run-analysis-dialog::backdrop { background: #071423a8; }
+.run-analysis-dialog > .run-analysis { margin: 0; }
+.run-analysis-dialog .analysis-heading { position: sticky; top: -18px; z-index: 5; margin-top: 0; padding: 12px 0; border-bottom: 1px solid var(--border); background: var(--surface); }
+.run-analysis-dialog .analysis-heading h2 { margin: 0; }
+.analysis-heading, .analysis-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0; }
+.analysis-heading { justify-content: space-between; align-items: center; }
+.analysis-section { margin: 14px 0; border: 1px solid var(--border); border-radius: 7px; padding: 14px; background: var(--surface); }
+.analysis-section > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.analysis-section[open] > summary { margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.diagram-embedded { min-width: 0; }
+.diagram-embedded .diagram-heading { position: static; }
+.analysis-controls label { min-width: 150px; }
+.analysis-log-text { max-height: 480px; overflow: auto; border: 1px solid var(--border); padding: 10px; font: 13px/1.7 Consolas, monospace; white-space: pre; }
+.analysis-log-text > div { display: flex; min-height: 1.7em; }
+.analysis-log-text.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+.analysis-log-text.wrap > div > span:last-child { min-width: 0; }
+.log-line-number { display: inline-block; min-width: 4em; padding-right: 12px; text-align: right; opacity: .6; user-select: none; flex: 0 0 auto; }
+.delay-table { max-height: 460px; }
+.delay-table td { min-width: 82px; text-align: right; padding: 8px; font-variant-numeric: tabular-nums; }
+.delay-table small { display: block; font-weight: normal; }
+.delay-positive { color: #c74636; }
+.delay-negative { color: #247cb5; }
+.delay-selected { background: var(--soft); box-shadow: inset 0 -2px var(--primary); }
+.delay-ranges input { width: 145px; }
+.delay-chart { width: 100%; min-height: 200px; border: 1px solid var(--border); color: var(--text); touch-action: none; }
+.delay-chart text { fill: currentColor; font-size: 12px; }
+.delay-grid { stroke: var(--border); stroke-width: 1; }
+.delay-chart path, .delay-chart circle { cursor: pointer; }
+[data-theme='dark'] .delay-positive { color: #ff9d8e; }
+[data-theme='dark'] .delay-negative { color: #8fcfff; }

@@ -13,10 +13,10 @@ export interface EditorSnapshot {
   }
 }
 interface Transfer { target: EditorTarget; snapshot: EditorSnapshot }
-export const dockChannel = 'redams.timetable.dock.v1'
+export const dockChannel = '.timetable.dock.v1'
 const children = new Map<string, Window>()
-const transferKey = (nonce: string) => `redams.editor-transfer.${nonce}`
-export const draftKey = (kind: ObjectType, id: string) => `redams.editor.${kind}.${id}`
+const transferKey = (nonce: string) => `redaims.editor-transfer.${nonce}`
+export const draftKey = (kind: ObjectType, id: string) => `redaims.editor.${kind}.${id}`
 
 export function readRoute(hash = window.location.hash): (EditorTarget & { mode: 'timetable' | 'workspace' }) | null {
   const [mode, query = ''] = hash.replace(/^#/, '').split('?')

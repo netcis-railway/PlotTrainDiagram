@@ -141,6 +141,7 @@ def build_series(meta, document, axis):
                 "object_type": meta["object_type"],
                 "object_id": meta["id"],
                 "object_name": meta["name"],
+                "run_no": meta.get("run_no") if meta["object_type"] == "run" else None,
                 "train_id": train["id"],
                 "train_course_id": course,
                 "train_base_date": str(train["train_base_date"]),

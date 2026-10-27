@@ -2,8 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import type { Kind } from '../api/client'
 import type { CatalogTreeNode } from '../types/catalogTree'
-const props = defineProps<{ nodes: CatalogTreeNode[]; selected: string; labels: Record<Kind, string>; path: (id: string) => string }>()
-const emit = defineEmits<{ select: [node: CatalogTreeNode] }>()
+const props = defineProps<{ nodes: CatalogTreeNode[]; selected: string; labels: Record<Kind, string>; path: (id: string) => string; contextMenu?: boolean }>()
+const emit = defineEmits<{ select: [node: CatalogTreeNode]; contextmenu: [node: CatalogTreeNode, event: MouseEvent | KeyboardEvent] }>()
 const storageKey = 'redams.catalog-collapsed'
 function restore(): Set<string> {
   try {
@@ -57,11 +57,22 @@ watch(() => props.selected, id => {
   }
   collapsed.value = next; persist()
 }, { immediate: true })
+function analysisLetter(node: CatalogTreeNode) {
+  if (node.logReference || node.analysisReference?.nodeType === 'solver-log') return 'S'
+  if (node.analysisReference?.nodeType === 'delay') return 'D'
+  if (node.viewReference || node.analysisReference?.nodeType === 'view') return 'V'
+  return ''
+}
 function focusRow(index: number) { root.value?.querySelectorAll<HTMLElement>('[data-tree-row]')[index]?.focus() }
+function contextmenu(node: CatalogTreeNode, event: MouseEvent | KeyboardEvent) {
+  if (!props.contextMenu) return
+  event.preventDefault(); (event.currentTarget as HTMLElement)?.focus(); emit('contextmenu', node, event)
+}
 function keydown(event: KeyboardEvent, index: number) {
   const row = rows.value[index]
   if (!row) return
   const { node, expandable } = row
+  if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { contextmenu(node, event); return }
   switch (event.key) {
     case 'ArrowDown': event.preventDefault(); focusRow(Math.min(index + 1, rows.value.length - 1)); break
     case 'ArrowUp': event.preventDefault(); focusRow(Math.max(index - 1, 0)); break
@@ -86,13 +97,17 @@ function keydown(event: KeyboardEvent, index: number) {
     <div v-for="(row, index) in rows" :key="row.node.id" role="treeitem" data-tree-row tabindex="0"
       :aria-level="row.depth + 1" :aria-selected="selected === row.node.id" :aria-expanded="row.expandable ? !collapsed.has(row.node.id) : undefined"
       class="category-tree-row" :class="{ active: selected === row.node.id }" :style="{ paddingLeft: `${8 + row.depth * 16}px` }" :title="path(row.node.id)"
-      @click="emit('select', row.node)" @dblclick="row.expandable && toggle(row.node.id)" @keydown.self="keydown($event, index)">
+      @contextmenu="contextmenu(row.node, $event)" @click="emit('select', row.node)" @dblclick="row.expandable && toggle(row.node.id)" @keydown.self="keydown($event, index)">
       <button v-if="row.expandable" class="tree-chevron" type="button" tabindex="-1" :aria-label="`${collapsed.has(row.node.id) ? '展开' : '折叠'} ${row.node.name}`" @click.stop="toggle(row.node.id)" @dblclick.stop>
         <svg viewBox="0 0 16 16" aria-hidden="true" :class="{ expanded: !collapsed.has(row.node.id) }"><path d="m6 3 5 5-5 5" /></svg>
       </button><span v-else class="tree-chevron-placeholder" aria-hidden="true" />
-      <svg v-if="row.node.baseReference" class="tree-diagram" viewBox="0 0 20 18" aria-hidden="true"><path d="M3 1h10l4 4v12H3Z M12 1v5h5 M6 13l3-4 3 3 3-4" /></svg>
+      <svg v-if="row.node.kind === 'run' || row.node.baseReference || analysisLetter(row.node)" class="tree-diagram" :class="{ 'tree-analysis-delay': analysisLetter(row.node) === 'D', 'tree-analysis-log': analysisLetter(row.node) === 'S' }" viewBox="0 0 20 18" aria-hidden="true">
+        <path d="M3 1h9l5 5v11H3Z M12 1v5h5" />
+        <text v-if="analysisLetter(row.node)" class="tree-document-letter" x="10" y="13.5" text-anchor="middle">{{ analysisLetter(row.node) }}</text>
+        <path v-else d="M6 13l3-4 3 3 3-4" />
+      </svg>
       <svg v-else class="tree-folder" viewBox="0 0 20 18" aria-hidden="true"><path v-if="row.expandable && !collapsed.has(row.node.id)" d="M2 6V3h6l2 2h7v2M2 7h17l-3 9H2Z" /><path v-else d="M2 3h6l2 2h8v11H2Z" /></svg>
-      <span class="tree-name">{{ row.node.name }}</span><small class="tree-kind">{{ row.node.baseReference ? '基本图' : labels[row.node.kind] }}</small>
+      <span class="tree-name">{{ row.node.name }}</span><small class="tree-kind">{{ row.node.logReference ? '求解日志' : row.node.analysisReference ? ({ view: '视图', 'solver-log': '求解日志', delay: '延误分析' })[row.node.analysisReference.nodeType] : row.node.viewReference ? '视图' : row.node.baseReference ? '基本图' : labels[row.node.kind] }}</small>
     </div>
   </div>
 </template>

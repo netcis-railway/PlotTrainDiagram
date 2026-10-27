@@ -195,6 +195,10 @@ def test_plot_api_resolves_real_base_shared_axis_overlay_and_keeps_saved_data_un
         assert run["axis"] == plotted["axis"]
         assert {s["object_type"] for s in run["series"]} == {"base", "run"}
         assert len(run["series"]) == 20
+        assert all(
+            s["run_no"] == (run["object"]["run_no"] if s["object_type"] == "run" else None)
+            for s in run["series"]
+        )
         assert client.get(base_url).json()["events"] == before["events"]
         stale = client.post("/api/v1/diagram/data", json=body)
         assert stale.status_code == 409

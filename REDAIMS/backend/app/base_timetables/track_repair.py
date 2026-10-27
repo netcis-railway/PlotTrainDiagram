@@ -21,7 +21,7 @@ from app.ingest.tracks import read_direction
 class LineChoice(BaseModel):
     model_config = ConfigDict(extra="forbid")
     line_ind: int = Field(ge=1, le=2147483647)
-    directions: list[Literal["UB", "DB"]] = Field(min_length=1, max_length=2)
+    directions: list[Literal["UB", "DB"]] = Field(min_length=1, max_length=1)
 
 
 class TrainChoice(BaseModel):
@@ -33,11 +33,13 @@ class TrainChoice(BaseModel):
 class RepairRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     repair_token: str
+    repair_conflicts: bool = False
     selections: list[TrainChoice] = Field(min_length=1, max_length=10000)
 
 
 class EditorRepairRequest(EditRequest):
     repair_token: str
+    repair_conflicts: bool = False
     selections: list[TrainChoice] = Field(min_length=1, max_length=10000)
 
 
@@ -51,12 +53,13 @@ def repair_context(doc, infrastructure, missing=()):
     missing = set(missing)
     lines = sorted(infrastructure.get("lines", []), key=lambda line: int(line["LINE_IND"]))
     members = infrastructure.get("members", [])
+    counts, warnings = conflict_context(doc)
     trains = []
     for train in doc["trains"]:
         visits = [e for e in doc["events"] if e["train_id"] == train["id"]]
         stations = {e["node_name"] for e in visits}
         related = sorted({int(m["line_ind"]) for m in members if m["node_name"] in stations})
-        empty = sum(e.get("track_code") in (None, "") for e in visits)
+        empty = sum(missing_track(e) for e in visits)
         trains.append(
             {
                 "id": train["id"],
@@ -65,10 +68,12 @@ def repair_context(doc, infrastructure, missing=()):
                 "direction": default_direction(train["train_course_id"]),
                 "missing_g": train["id"] in missing,
                 "empty_count": empty,
+                "conflict_count": counts[train["id"]],
                 "visits": len(visits),
             }
         )
     return {
+        "warnings": warnings,
         "trains": trains,
         "lines": [
             {"line_ind": int(line["LINE_IND"]), "line_name_chn": line["LINE_NAME_CHN"]}
@@ -93,8 +98,106 @@ def overlaps(left, right):
     return left[0] < right[1] and right[0] < left[1]
 
 
-def allocate(doc, infrastructure, selections):
-    """Solve each physical station independently, keeping unselected trains fixed."""
+def missing_track(event):
+    value = event.get("track_code")
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def ordered_events(doc):
+    # The same train order is shown in the repair context/window.
+    order = {train["id"]: index for index, train in enumerate(doc["trains"])}
+    return sorted(
+        doc["events"],
+        key=lambda event: (order[event["train_id"]], event.get("visit_seq", 0)),
+    )
+
+
+def repair_problem(doc, event, message):
+    names = {
+        node["node_name"]: node.get("node_name_chn", node["node_name"]) for node in doc["nodes"]
+    }
+    return {
+        "event_id": event["id"],
+        "train_course_id": event["train_course_id"],
+        "node_name": event["node_name"],
+        "node_name_chn": names.get(event["node_name"], event["node_name"]),
+        "message": message,
+    }
+
+
+def existing_occupations(doc, stations=None):
+    records, warnings = [], []
+    for event in ordered_events(doc):
+        if (stations is not None and event["node_name"] not in stations) or missing_track(event):
+            continue
+        try:
+            track, span = integer(event["track_code"]), interval(event)
+        except (ValueError, TypeError) as error:
+            warnings.append(repair_problem(doc, event, f"保留已有股道，无法核查占用：{error}"))
+            continue
+        records.append({"event": event, "track": track, "span": span})
+    return records, warnings
+
+
+def conflict_message(record, other):
+    return (
+        f"{record['event']['train_course_id']}在本站占用股道{record['track']}，"
+        f"与{other['event']['train_course_id']}的股道占用冲突"
+    )
+
+
+def conflict_context(doc):
+    records, warnings = existing_occupations(doc)
+    seen, counts = defaultdict(list), defaultdict(int)
+    for record in records:
+        event = record["event"]
+        key = (event["node_name"], record["track"])
+        for other in seen[key]:
+            if overlaps(record["span"], other["span"]):
+                warnings.append(repair_problem(doc, event, conflict_message(record, other)))
+                counts[event["train_id"]] += 1
+                counts[other["event"]["train_id"]] += 1
+        seen[key].append(record)
+    return counts, warnings
+
+
+def repair_candidates(doc, infrastructure, event, selected, warnings):
+    preferred, fallback, unknown = set(), set(), False
+    passing = bool(
+        event.get("arrival")
+        and event.get("departure")
+        and event["arrival"]["seconds"] == event["departure"]["seconds"]
+    )
+    for choice in selected.lines:
+        for member in infrastructure.get("members", []):
+            if (
+                member["node_name"] != event["node_name"]
+                or int(member["line_ind"]) != choice.line_ind
+            ):
+                continue
+            try:
+                tracks = read_direction(member, choice.directions[0])
+            except ValueError:
+                unknown = True
+                continue
+            stops = set(tracks.stop_tracks)
+            main = {tracks.main_track} if tracks.main_track is not None else set()
+            preferred.update(main if passing else stops)
+            fallback.update(stops if passing else main)
+    candidates = sorted(preferred) + sorted(fallback - preferred)
+    if unknown:
+        warnings.append(
+            repair_problem(
+                doc, event, "所选线路/方向的股道资料未知；仅使用已知资料，无法修复时保留原值"
+            )
+        )
+    elif not candidates:
+        warnings.append(repair_problem(doc, event, "所选线路/方向在本站没有可用股道，保留原值"))
+    return candidates
+
+
+def allocate(doc, infrastructure, selections, repair_conflicts=False):
+    """Fill missing tracks; optionally move later conflicting existing visits in window order."""
     trains = {t["id"]: t for t in doc["trains"]}
     choices = {}
     known_lines = {int(line["LINE_IND"]) for line in infrastructure.get("lines", [])}
@@ -105,133 +208,124 @@ def allocate(doc, infrastructure, selections):
         if len(ids) != len(set(ids)) or not set(ids) <= known_lines:
             raise ValueError("所选线路不存在或重复")
         choices[choice.train_id] = choice
-    issues, warnings, jobs, reserved = [], [], defaultdict(list), defaultdict(list)
-    members = infrastructure.get("members", [])
-    names = {n["node_name"]: n.get("node_name_chn", n["node_name"]) for n in doc["nodes"]}
-
-    def problem(event, message):
-        return {
-            "event_id": event["id"],
-            "train_course_id": event["train_course_id"],
-            "node_name": event["node_name"],
-            "node_name_chn": names.get(event["node_name"], event["node_name"]),
-            "message": message,
-        }
-
-    selected_stations = {e["node_name"] for e in doc["events"] if e["train_id"] in choices}
-    for event in doc["events"]:
-        if event["node_name"] not in selected_stations:
+    stations = {e["node_name"] for e in doc["events"] if e["train_id"] in choices}
+    records, warnings = existing_occupations(doc, stations)
+    issues, assignments = [], {}
+    kept = defaultdict(list)
+    # Protect original occupations, including later and unselected visits.
+    reserved = defaultdict(list)
+    for record in records:
+        reserved[(record["event"]["node_name"], record["track"])].append(record)
+    for record in records:
+        event = record["event"]
+        selected = choices.get(event["train_id"])
+        candidates = (
+            repair_candidates(doc, infrastructure, event, selected, warnings) if selected else []
+        )
+        key = (event["node_name"], record["track"])
+        conflicts = [r for r in kept[key] if overlaps(record["span"], r["span"])]
+        messages = [conflict_message(record, other) for other in conflicts]
+        if conflicts and repair_conflicts and selected:
+            free = [
+                track
+                for track in candidates
+                if not any(
+                    r is not record and overlaps(record["span"], r["span"])
+                    for r in reserved[(event["node_name"], track)]
+                )
+            ]
+            if free:
+                reserved[key].remove(record)
+                record["track"] = free[0]
+                assignments[event["id"]] = free[0]
+                reserved[(event["node_name"], free[0])].append(record)
+                messages = [message + f"；已改分配到股道{free[0]}" for message in messages]
+            elif candidates:
+                warnings.append(
+                    repair_problem(doc, event, "股道容量不足，无法修复已有冲突，保留原股道")
+                )
+        for message in messages:
+            warnings.append(repair_problem(doc, event, message))
+        kept[(event["node_name"], record["track"])].append(record)
+    jobs = defaultdict(list)
+    for event in ordered_events(doc):
+        if event["node_name"] not in stations or not missing_track(event):
             continue
         selected = choices.get(event["train_id"])
         if not selected:
-            try:
-                track = integer(event["track_code"])
-            except (ValueError, TypeError):
-                warnings.append(
-                    problem(event, "未选列车股道缺失或无效，无法检查其占用；可将该列车一并选中修复")
-                )
-                continue
-            try:
-                reserved[(event["node_name"], track)].append(interval(event))
-            except ValueError as error:
-                issues.append(problem(event, f"未选列车已有股道但{error}"))
+            warnings.append(repair_problem(doc, event, "未选列车股道缺失，无法核查其占用"))
             continue
         try:
             span = interval(event)
         except ValueError as error:
-            issues.append(problem(event, str(error)))
+            issues.append(repair_problem(doc, event, str(error)))
             continue
-        preferred, fallback = set(), set()
-        passing = bool(
-            event.get("arrival")
-            and event.get("departure")
-            and event["arrival"]["seconds"] == event["departure"]["seconds"]
-        )
-        unknown = False
-        for choice in selected.lines:
-            for member in members:
-                if (
-                    member["node_name"] != event["node_name"]
-                    or int(member["line_ind"]) != choice.line_ind
-                ):
-                    continue
-                for direction in set(choice.directions):
-                    try:
-                        tracks = read_direction(member, direction)
-                    except ValueError:
-                        unknown = True
-                        continue
-                    stops = set(tracks.stop_tracks)
-                    main = {tracks.main_track} if tracks.main_track is not None else set()
-                    preferred.update(main if passing else stops)
-                    fallback.update(stops if passing else main)
-        candidates = sorted(preferred) + sorted(fallback - preferred)
-        if not candidates:
-            issues.append(
-                problem(
-                    event,
-                    "所选线路/方向的股道资料未知" if unknown else "所选线路/方向在本站没有可用股道",
-                )
-            )
-        jobs[event["node_name"]].append((event, span, candidates))
-    # Filter after all fixed reservations have been gathered, regardless of source order.
-    assignments = {}
-    for station, rows in jobs.items():
-        pending = []
-        for event, span, tracks in rows:
+        candidates = repair_candidates(doc, infrastructure, event, selected, warnings)
+        if candidates:
             allowed = [
-                t for t in tracks if not any(overlaps(span, s) for s in reserved[(station, t)])
+                track
+                for track in candidates
+                if not any(overlaps(span, r["span"]) for r in reserved[(event["node_name"], track)])
             ]
-            if tracks and not allowed:
-                issues.append(problem(event, "可选股道均与未选列车占用重叠"))
-            pending.append((event, span, allowed))
-        if any(not row[2] for row in pending):
-            continue
-        occupied = defaultdict(list)
-        attempts = 0
+            jobs[event["node_name"]].append((event, span, allowed))
+    for rows in jobs.values():
+        accepted, station_assignments, attempts = [], {}, 0
 
-        def solve(remaining):
+        def solve(remaining, occupied, trial):
             nonlocal attempts
             attempts += 1
             if attempts > 20000:
                 return False
             if not remaining:
                 return True
-            options = []
-            for event, span, tracks in remaining:
-                free = [t for t in tracks if not any(overlaps(span, s) for s in occupied[t])]
-                options.append((event, span, free))
-            event, span, free = min(
-                options, key=lambda r: (len(r[2]), r[1][0], r[0]["train_course_id"], r[0]["id"])
-            )
-            rest = [r for r in remaining if r[0]["id"] != event["id"]]
+            options = [
+                (
+                    event,
+                    span,
+                    [t for t in tracks if not any(overlaps(span, s) for s in occupied[t])],
+                )
+                for event, span, tracks in remaining
+            ]
+            event, span, free = min(options, key=lambda row: len(row[2]))
+            rest = [row for row in remaining if row[0]["id"] != event["id"]]
             for track in free:
                 occupied[track].append(span)
-                assignments[event["id"]] = track
-                if solve(rest):
+                trial[event["id"]] = track
+                if solve(rest, occupied, trial):
                     return True
                 occupied[track].pop()
-                assignments.pop(event["id"], None)
+                trial.pop(event["id"], None)
             return False
 
-        # Bound per-station recursion depth and report oversized selections explicitly.
-        if len(pending) > 500:
-            issues.append(problem(pending[0][0], "本站待分配访问超过500条，请分批选择列车"))
-        elif not solve(pending):
-            issues.append(
-                problem(
-                    pending[0][0],
-                    "搜索达到上限，请缩小选择范围"
-                    if attempts > 20000
-                    else "股道容量不足，无法在占用不重叠的条件下分配，请调整线路/方向或时刻",
-                )
-            )
+        for row in rows:
+            event = row[0]
+            if len(accepted) >= 500 or attempts > 20000:
+                message = "分配达到搜索/访问上限，保留原值，请分批修复"
+            else:
+                occupied = defaultdict(list)
+                for earlier, span, _ in accepted:
+                    occupied[station_assignments[earlier["id"]]].append(span)
+                free = [
+                    track
+                    for track in row[2]
+                    if not any(overlaps(row[1], span) for span in occupied[track])
+                ]
+                trial = dict(station_assignments) if free else {}
+                if free:
+                    trial[event["id"]] = free[0]
+                if free or (row[2] and solve(accepted + [row], defaultdict(list), trial)):
+                    accepted.append(row)
+                    station_assignments = trial
+                    continue
+                message = "股道容量不足，当前没有可用且不冲突的股道，保留原值"
+            warnings.append(repair_problem(doc, event, message))
+        assignments.update(station_assignments)
     if issues:
         return {"can_apply": False, "changes": [], "issues": issues, "warnings": warnings}
     changes = [
-        {"event_id": e["id"], "field": "track_code", "value": assignments[e["id"]]}
-        for e in doc["events"]
-        if e["id"] in assignments
+        {"event_id": event["id"], "field": "track_code", "value": assignments[event["id"]]}
+        for event in doc["events"]
+        if event["id"] in assignments
     ]
     return {"can_apply": True, "changes": changes, "issues": [], "warnings": warnings}
 
@@ -270,7 +364,7 @@ class TrackRepairService:
             doc, infrastructure, stamp = self.editor_state(c, kind, object_id, request)
             if request.repair_token != stamp:
                 raise ImportConflict("修复预览已过期，请重新打开窗口")
-            return allocate(doc, infrastructure, request.selections)
+            return allocate(doc, infrastructure, request.selections, request.repair_conflicts)
 
     def workbook_state(self, c, job_id):
         original, options, infrastructure, stamp = import_source(c, self.base, job_id)
@@ -359,7 +453,7 @@ class TrackRepairService:
             )
             if request.repair_token != stamp:
                 raise ImportConflict("源文件或基本图上下文已变化，请重新打开修复窗口")
-            result = allocate(doc, infrastructure, request.selections)
+            result = allocate(doc, infrastructure, request.selections, request.repair_conflicts)
             if not result["can_apply"]:
                 return result, None
             # Write selected G columns only. Nonselected missing-G groups remain blocking.

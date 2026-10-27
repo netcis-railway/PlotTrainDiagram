@@ -100,3 +100,44 @@ EditRequest新增可选date_base，changes允许为空（此时必须有日期�
 ## 2026-10-26：SEQ缺列修复与整车平移
 
 SEQ修复只返回内存文件副本重新预检，不更新原任务/正式对象，不新增字段。时间平移返回到发Change并按现有版本校验、事务保存持久化；不单独保存偏移命令，Excel源副本不变。 详见[SEQ修复](sequence_repair_guide.md)与[整车平移](time_shift_guide.md)。
+
+
+## run 求解日志附件（2026-10-27）
+
+新增 `run_solver_logs`，由数据库初始化使用 CREATE TABLE IF NOT EXISTS 创建，可兼容已有数据库。
+
+| 字段 | 类型 / 约束 |
+| --- | --- |
+| id | VARCHAR PRIMARY KEY |
+| run_id | VARCHAR NOT NULL，所属普通 run |
+| filename | VARCHAR NOT NULL，原始文件名末段 |
+| size_bytes | BIGINT NOT NULL |
+| digest | VARCHAR NOT NULL，SHA-256 |
+| content | BLOB NOT NULL，原始日志字节 |
+| created_at | TIMESTAMP NOT NULL DEFAULT current_timestamp |
+
+唯一键为 (run_id, filename, digest)。日志正文和元数据在同一数据库事务保存；普通 run 的存在性在同一事务检查。分类删除的 run 删除事务同步清理该表；移动和取消分组保留记录。旧版 role=base 不接受日志附件，不参与基本图迁移快照。时刻表修订号不包含日志附件。
+
+
+## run 保存的运行图视图（2026-10-27）
+
+新增run_diagram_views，由初始化CREATE TABLE IF NOT EXISTS兼容创建。
+
+| 字段 | 类型 / 约束 |
+| --- | --- |
+| id | VARCHAR PRIMARY KEY |
+| run_id | VARCHAR NOT NULL |
+| name | VARCHAR NOT NULL |
+| state | JSON NOT NULL，version=1显示选择与坐标范围 |
+| snapshot | JSON NOT NULL，绘图上下文与绘图数据快照 |
+| created_at | TIMESTAMPTZ NOT NULL DEFAULT current_timestamp |
+
+唯一键(run_id,name)。不创建真实catalog_nodes分类，以viewReference虚拟叶节点挂在所属run下。摘要查询不返回快照正文；详情按run_id/id读取。视图状态、快照、名称在一个事务保存；run删除事务清理该表，转移/取消分组不改记录。快照不依赖当前基本图和事件ID再解析，不回写run数据或修订，不参与旧基本图迁移。
+
+## run统一分析节点
+
+新增run_analysis_nodes，初始化CREATE TABLE IF NOT EXISTS兼容已有数据库。字段id VARCHAR PRIMARY KEY、run_id VARCHAR NOT NULL、node_type VARCHAR NOT NULL（view/solver-log/delay）、name VARCHAR NOT NULL、state JSON NOT NULL、created_at TIMESTAMPTZ DEFAULT current_timestamp。唯一键(run_id,node_type,name)。
+
+state.version=1，记录三个小节的展开状态、运行图选择与快照、日志附件ID及展示配置、延误展示配置及结果快照。求解日志正文继续存run_solver_logs，节点引用本run附件；日志原文件不因文本编码选择而改变。run删除事务同步清理run_analysis_nodes，移动/取消分组保留。旧run_diagram_views不迁移或删除，前端兼容显示为视图子节点。analysisReference/logReference与旧viewReference均为前端虚拟叶节点，parent_id为所属run，不写入真实catalog_nodes。
+
+分析节点和日志不参与时刻表修订号。详情按run_id+node_id隔离，目录仅返回摘要。保存事务校验run及日志归属。运行图/延误快照与日后源数据修订分离。

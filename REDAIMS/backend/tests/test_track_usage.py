@@ -255,6 +255,67 @@ def test_occupation_missing_tracks_times_inversions_midnight_and_zero_length():
     assert any(i["code"] == "track_direction" for i in issues) and not train["segments"]
 
 
+@pytest.mark.parametrize("direction,track", [("down", 9), ("up", 16)])
+@pytest.mark.parametrize("seconds", [0, 100, 86400])
+def test_pass_through_connects_boundaries_and_marks_assigned_track(direction, track, seconds):
+    train = series(direction=direction, track=track, arrival=seconds, departure=seconds)
+    actual = deepcopy(train["events"][0])
+    expanded, issues = expand_track_usage([train], [resource()], ["station"], 3600)
+    assert expanded == ["station"] and not issues
+    assert [segment["kind"] for segment in train["segments"]] == ["track_pass"]
+    boundary = -2 if direction == "down" else 2
+    assert [point["track_offset"] for point in train["points"][:2]] == [boundary, -boundary]
+    assert [point["seconds"] for point in train["points"]] == [seconds] * 3
+    marker = train["points"][2]
+    assert marker["usage_kind"] == "pass_track"
+    assert marker["track_offset"] == (1 if track == 9 else -1)
+    usage = train["events"][0]["track_usage"]
+    assert usage["passing"] and usage["can_occupy"] and not usage["defaulted"]
+    assert usage["start_seconds"] == usage["end_seconds"] == seconds
+    assert usage["adopted_track"] == track
+    assert {k: v for k, v in train["events"][0].items() if k != "track_usage"} == actual
+
+
+@pytest.mark.parametrize("direction", ["down", "up"])
+@pytest.mark.parametrize("track", [None, 99, True])
+def test_unassigned_pass_uses_main_midpoint_instead_of_default_track_one(direction, track):
+    yard = resource((1, 2, 9, 10, 16, 20))
+    yard["directions"] = {"down": {"main_track": 9}, "up": {"main_track": 16}}
+    train = series(direction=direction, track=track, arrival=100, departure=100)
+    _, issues = expand_track_usage([train], [yard], ["station"], 1)
+    assert [segment["kind"] for segment in train["segments"]] == ["track_pass"]
+    marker = train["points"][2]
+    assert marker["usage_kind"] == "track_unassigned" and marker["seconds"] == 100
+    # Main lines 9 and 16 are at +0.5 and -1.5; their midpoint is not the band center.
+    assert marker["track_offset"] == -0.5
+    usage = train["events"][0]["track_usage"]
+    assert usage["adopted_track"] is None and not usage["defaulted"] and not usage["can_occupy"]
+    assert train["events"][0]["track_code"] == track
+    expected_code = "track_missing" if track is None else "track_invalid"
+    assert [issue["code"] for issue in issues] == [expected_code]
+    assert issues[0]["source"]["row"] == 3
+
+
+@pytest.mark.parametrize("main", [None, 9])
+def test_unassigned_pass_handles_absent_or_shared_main_without_inventing_tracks(main):
+    yard = resource()
+    yard["directions"] = {"down": {"main_track": main}, "up": {"main_track": main}}
+    train = series(track=None, arrival=100, departure=100)
+    _, issues = expand_track_usage([train], [yard], ["station"], 1)
+    assert train["points"][2]["track_offset"] == (0 if main is None else 1)
+    assert ("track_main_missing" in [issue["code"] for issue in issues]) == (main is None)
+    assert train["events"][0]["track_usage"]["adopted_track"] is None
+
+
+def test_unknown_direction_pass_marks_explicit_track_without_guessing_arrival_boundaries():
+    train = series(direction="unknown", track=16, arrival=100, departure=100)
+    _, issues = expand_track_usage([train], [resource()], ["station"], 1)
+    assert [issue["code"] for issue in issues] == ["track_direction"]
+    assert all("track_offset" not in point for point in train["points"][:2])
+    assert train["points"][2]["usage_kind"] == "pass_track"
+    assert train["points"][2]["track_offset"] == -1
+
+
 def test_track_resources_do_not_mix_lines_and_support_stop_only_members():
     station = {"node_id": "station", "node_name": "S", "node_name_chn": "车站"}
     rows = [

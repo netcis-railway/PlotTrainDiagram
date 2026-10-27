@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import importDefaults from '../../import-defaults.json'
 import type { CatalogNode } from '../api/client'
 import { baseApi, formatIssueNode, request, formatPath, type OrdinaryRun, type ValidationIssue } from '../api/baseImport'
 import { runImportApi, type RunImportJob, type RunJobSummary } from '../api/runImport'
@@ -11,7 +12,7 @@ const props = defineProps<{ nodes: CatalogNode[]; initialBatchId: string }>()
 const emit = defineEmits<{ imported: [id: string] }>()
 const batch = ref(props.initialBatchId), name = ref(''), runNo = ref('')
 const mode = ref<'create' | 'replace'>('create'), target = ref('')
-const dateBase = ref('2026-01-01'), dateMode = ref<'rebase' | 'preserve'>('rebase'), sheet = ref('')
+const dateBase = ref(importDefaults.runDateBase), dateMode = ref<'rebase' | 'preserve'>('rebase'), sheet = ref('')
 const file = ref<File | null>(null), availableSheets = ref<string[]>([]), picker = ref(false)
 const job = ref<RunImportJob | null>(null), jobs = ref<RunJobSummary[]>([]), runs = ref<OrdinaryRun[]>([])
 const busy = ref(false), error = ref(''), activeSheet = ref(''), severity = ref('all')
@@ -54,7 +55,7 @@ async function inspect() {
 async function repaired(repairedFile: File, warnings: number) {
   repairOpen.value = false; sequenceOpen.value = false
   file.value = repairedFile
-  repairStatus.value = `已使用修复后的 ${repairedFile.name} 重新预检。${warnings ? `有 ${warnings} 条未选列车股道缺失或无效，其占用尚不能核查。` : ''}`
+  repairStatus.value = `已使用修复后的 ${repairedFile.name} 重新预检。${warnings ? `有 ${warnings} 条股道修复告警，请核对资料未知的访问、未修复股道及无法核查的占用。` : ''}`
   await inspect()
 }
 async function commit() {
@@ -108,7 +109,7 @@ onMounted(loadJobs)
     <label>run 问题筛选<select v-model="severity"><option value="all">全部</option><option value="error">阻断错误</option><option value="warning">警告</option></select></label>
     <div class="validation-list"><button v-for="(issue,i) in issues" :key="i" :class="issue.severity === 'error' ? 'validation-error' : 'validation-warning'" @click="locate(issue)">{{ issue.severity === 'error' ? '错误' : '警告' }} · {{ issue.sheet || '导入设置' }} {{ issue.cell || issue.row || '' }} / {{ issue.field }}{{ formatIssueNode(issue) }}：{{ issue.message }}</button></div>
     <label>run 表格预览<select v-model="activeSheet"><option v-for="t in job.report.previews" :key="t.name" :value="t.name">{{ t.name }}</option></select></label>
-    <div v-if="table" class="table-wrap"><table><thead><tr><th>源行</th><th v-for="(h,i) in table.headers" :key="i">{{ h }}</th></tr></thead><tbody><tr v-for="row in table.rows" :id="`run-preview-row-${row.row}`" :key="row.row"><th>{{ row.row }}</th><td v-for="(v,i) in row.values" :key="i" :class="cellIssue(row.row,i)?.severity === 'error' ? 'validation-error' : cellIssue(row.row,i) ? 'validation-warning' : ''" :title="cellIssue(row.row,i)?.message">{{ v ?? '—' }}</td></tr></tbody></table></div>
+    <div v-if="table" class="table-wrap run-preview-table" tabindex="0" role="region" aria-label="run 表格预览，源行和 NODE_NAME_CHN 固定"><table><thead><tr><th class="preview-source" scope="col">源行</th><th v-for="(h,i) in table.headers" :key="i" scope="col" :class="{ 'preview-station': String(h).trim().toUpperCase() === 'NODE_NAME_CHN' }">{{ h }}</th></tr></thead><tbody><tr v-for="row in table.rows" :id="`run-preview-row-${row.row}`" :key="row.row"><th class="preview-source" scope="row">{{ row.row }}</th><td v-for="(v,i) in row.values" :key="i" :class="[{ 'preview-station': String(table.headers[i]).trim().toUpperCase() === 'NODE_NAME_CHN' }, cellIssue(row.row,i)?.severity === 'error' ? 'validation-error' : cellIssue(row.row,i) ? 'validation-warning' : '']" :title="cellIssue(row.row,i)?.message">{{ v ?? '—' }}</td></tr></tbody></table></div>
     <h3>run 列车实例基准日</h3><div class="table-wrap"><table><thead><tr><th>车次</th><th>基准日</th><th>采用 SEQ</th><th>核验</th></tr></thead><tbody><tr v-for="t in job.report.trains" :key="t.train_course_id"><td>{{ t.train_course_id }}</td><td>{{ t.train_base_date }}</td><td>{{ t.adopted_seq }}</td><td>{{ t.fallback ? '首条缺发车，需核验' : '首条发车日期' }}</td></tr></tbody></table></div>
     <label class="confirmation"><input v-model="dateConfirmed" type="checkbox" :disabled="busy" />已核对 run 运行基准日及日期解释</label>
     <label class="confirmation"><input v-model="trainsConfirmed" type="checkbox" :disabled="busy" />已核对 run 列车实例基准日</label>

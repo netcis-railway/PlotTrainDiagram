@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import type { DiagramViewSummary } from '../api/diagram'
+import type { AnalysisNodeSummary, AnalysisSection } from '../api/analysis'
+import RunAnalysis from './RunAnalysis.vue'
+import type { TimetableActionRequest } from '../catalogActions'
 import type { CatalogNode } from '../api/client'
 import { request, post, objectUrl, formatPath, labels, type EditorData, type Change, type EditField, type EditValidation, type MovePreview, type TimetableEvent, type ValidationIssue } from '../api/baseImport'
 import CategoryPicker from './CategoryPicker.vue'
@@ -10,8 +14,10 @@ import TimeShift from './TimeShift.vue'
 import type { RepairIssue } from '../api/trackRepair'
 import { availableLines, stationsOnLine, orderStations, orderTrains, originalOrder, type StationSort, type TrainSort } from '../timetableOrdering'
 import { dockChannel, draftKey, editorHash, forgetTransfer, launchEditor, readTransfer, writeTransfer, type EditorSnapshot } from '../editorWindow'
-const props = defineProps<{ objectType: 'base' | 'run'; objectId: string; nodes: CatalogNode[]; standalone?: boolean; transfer?: string }>()
-const emit = defineEmits<{ changed: [owner: string | null] }>()
+const props = defineProps<{ objectType: 'base' | 'run'; objectId: string; nodes: CatalogNode[]; standalone?: boolean; transfer?: string; actionRequest?: TimetableActionRequest }>()
+const emit = defineEmits<{ changed: [owner: string | null]; viewSaved: [view: DiagramViewSummary]; analysisSaved: [node: AnalysisNodeSummary]; logsChanged: [] }>()
+const analysisSection = ref<AnalysisSection>('diagram')
+const editorRoot = ref<HTMLElement | null>(null)
 const data = ref<EditorData | null>(null), error = ref(''), status = ref(''), busy = ref(false)
 const draftRevision = ref(''), dateBase = ref(''), checkedBaseDate = ref(false), exportOpen = ref(false), validationPanel = ref<HTMLElement | null>(null)
 const changes = ref<Record<string, Change>>({}), validation = ref<EditValidation | null>(null)
@@ -75,7 +81,7 @@ function applyTrackRepair(repairs: Change[], warnings: RepairIssue[]) {
   repairWarnings.value = warnings; shiftWarnings.value = []
   applyDraftChanges(repairs)
   showTracks.value = true; repairOpen.value = false
-  status.value = `已生成 ${repairs.length} 条股道分配，请校验并保存。`
+  status.value = repairs.length ? `已生成 ${repairs.length} 条股道分配${warnings.length ? `，有 ${warnings.length} 条修复告警` : ''}，请核对后校验并保存。` : '本次没有生成股道修改，请查看修复告警；已有非冲突股道保持原值。'
 }
 function applyTimeShift(items: Change[], warnings: ValidationIssue[]) {
   shiftWarnings.value = warnings; repairWarnings.value = []
@@ -174,6 +180,22 @@ let restoring = false
 watch(trains, () => { hiddenTrains.value = hiddenTrains.value.filter(id => trains.value.includes(id)) }, { flush: 'sync' })
 watch([selectedLine, stations, trains, hiddenTrains, showTracks, showSeq, stationOrder, trainSort, sortStation], () => { if (!restoring) persist() }, { deep: true })
 
+let handledAction = 0
+watch([() => props.actionRequest, data, busy, detached], async () => {
+  const request = props.actionRequest
+  if (!request || request.sequence === handledAction || request.objectId !== props.objectId || request.kind !== props.objectType || request.action === 'delete' || !data.value || busy.value) return
+  handledAction = request.sequence
+  if (detached.value) { childWindow?.focus(); return }
+  await nextTick()
+  if (props.actionRequest !== request) return
+  editorRoot.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  editorRoot.value?.focus({ preventScroll: true })
+  if (request.action === 'diagram' || request.action === 'delay') {
+    analysisSection.value = request.action === 'delay' ? 'delay' : 'diagram'
+    if (draftMismatch.value) { error.value = '请先核对并处理旧版本草稿，再查看运行图。'; return }
+    plotOpen.value = true
+  }
+}, { immediate: true })
 let loadGeneration = 0
 async function load() {
   const generation = ++loadGeneration
@@ -272,16 +294,17 @@ function trainDate(day: string) {
 watch(dateBase, () => { validation.value = null; checkedBaseDate.value = false; checkedDates.value = false; checkedWarnings.value = false; applyTrainSort(); if (!restoring) persist() }, { flush: 'sync' })
 watch(() => [props.objectType, props.objectId], load, { immediate: true })
 </script>
-<template><div class="timetable-editor">
+<template><div ref="editorRoot" class="timetable-editor" tabindex="-1">
   <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="status" role="status">{{ status }}</p>
   <details v-if="repairWarnings.length" class="validation-warning"><summary>股道修复提示（{{ repairWarnings.length }}）</summary><ul><li v-for="(issue, i) in repairWarnings" :key="i">{{ issue.train_course_id }} · {{ issue.node_name_chn }}：{{ issue.message }}</li></ul></details>
   <details v-if="shiftWarnings.length" class="validation-warning"><summary>整车平移提示（{{ shiftWarnings.length }}）</summary><ul><li v-for="(issue, i) in shiftWarnings" :key="i">{{ issue.message }}</li></ul></details>
   <p v-if="busy" role="status">正在处理…</p>
   <div v-if="detached" class="category-context" role="status"><p>此时刻表已在独立标签页中编辑。点击该页的“Dock · 嵌回主界面”返回；关闭独立页也会恢复当前编辑器。</p><button @click="resumeEmbedded()">前往独立编辑页</button> <button @click="recoverHere">恢复到当前界面</button> <a :href="detachedUrl" target="_blank">独立编辑页链接</a></div>
   <template v-if="data && !detached">
+    <RunAnalysis v-if="plotOpen && objectType === 'run'" :key="analysisSection" :run-id="objectId" :run-name="data.object.name" :section="analysisSection" :source="{ revision: data.revision, dateBase, originalDateBase: data.object.date_base || '', changes: changeList, initialLine: selectedLine }" @close="plotOpen = false; analysisSection = 'diagram'" @saved="emit('analysisSaved', $event)" @logs-changed="emit('logsChanged')" />
     <div class="editor-heading"><div><h3>{{ objectType === 'base' ? '基本图' : 'run' }}时刻表：{{ data.object.name }}</h3><p>{{ data.object.baseTT_no || `run_${data.object.run_no}` }} · 基准日 {{ data.object.date_base || '尚无正式时刻数据' }}</p>
       <p><strong>直属类别：</strong>{{ data.object.classification_path.length ? `${labels[data.object.classification_path.at(-1)!.kind]} ${data.object.classification_path.at(-1)!.name}` : '未分组' }}</p><p class="muted">{{ formatPath(data.object.classification_path) }}</p></div>
-      <div class="editor-window-actions"><button :disabled="busy || docking || draftMismatch" @click="plotOpen = true">查看运行图</button><button :disabled="busy || docking" @click="openMove">编辑所属类别</button>
+      <div class="editor-window-actions"><button :disabled="busy || docking || draftMismatch" @click="analysisSection = 'diagram'; plotOpen = true">查看运行图</button><button :disabled="busy || docking" @click="openMove">编辑所属类别</button>
       <button v-if="standalone" :disabled="busy || docking" @click="dock">{{ docking ? '正在嵌回…' : 'Dock · 嵌回主界面' }}</button>
       <button v-else :disabled="busy" @click="popout">在新标签页中编辑</button>
       <button :disabled="busy || docking || draftMismatch || !data.events.length" @click="shiftOpen = true">整车时间平移</button>
@@ -289,7 +312,7 @@ watch(() => [props.objectType, props.objectId], load, { immediate: true })
       <button :disabled="busy || docking || hasChanges || draftMismatch" @click="exportOpen = true">导出</button></div></div>
     <div class="editor-date"><label>运行基准日<input v-model="dateBase" type="date" min="2020-01-01" max="9999-12-31" :disabled="busy || docking || !data.object.date_base" /></label>
       <p class="muted">修改基准日后，保存会更新全部到发日期和列车基准日，保留时分秒与跨日偏移。导出前请先保存修改。</p></div>
-    <TimetableDiagram v-if="plotOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :date-base="dateBase" :original-date-base="data.object.date_base || ''" :changes="changeList" :initial-line="selectedLine" @close="plotOpen = false" />
+    <TimetableDiagram v-if="plotOpen && objectType === 'base'" :object-type="objectType" :object-id="objectId" :revision="data.revision" :date-base="dateBase" :original-date-base="data.object.date_base || ''" :changes="changeList" :initial-line="selectedLine" @view-saved="emit('viewSaved', $event)" @close="plotOpen = false" />
     <TimeShift v-if="shiftOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" :trains="data.trains" :initial-selected="trains" @close="shiftOpen = false" @applied="applyTimeShift" />
     <TrackRepair v-if="repairOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" @close="repairOpen = false" @applied="applyTrackRepair" />
     <TimetableExport v-if="exportOpen" :url="url" :revision="data.revision" :object-type="objectType" @close="exportOpen = false" />
