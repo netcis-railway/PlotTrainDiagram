@@ -43,12 +43,12 @@ async function logout() {
 <template>
   <LoginView v-if="!session" :busy="busy" :error="error" @login="login" />
   <div v-else-if="route?.mode === 'timetable'" class="standalone-editor">
-    <header class="app-header"><strong>REDAMS · 时刻表独立编辑</strong><div class="header-right"><ThemeToggle /><span class="user-name">{{ session.displayName }}</span><button class="header-button" :disabled="busy" @click="logout">退出登录</button></div></header>
+    <header class="app-header"><strong>REDAIMS · 时刻表独立编辑</strong><div class="header-right"><ThemeToggle /><span class="user-name">{{ session.displayName }}</span><button class="header-button" :disabled="busy" @click="logout">退出登录</button></div></header>
     <TimetableWindowView :target="route" />
   </div>
   <div v-else class="app-shell" :class="{ collapsed }">
     <aside class="app-sidebar">
-      <div class="sidebar-brand"><span class="brand-mark">R</span><span v-if="!collapsed">REDAMS<small>运行图分析系统</small></span></div>
+      <div class="sidebar-brand"><span class="brand-mark">R</span><span v-if="!collapsed">REDAIMS<small>运行图分析系统</small></span></div>
       <nav aria-label="功能导航">
         <button :class="{ active: view === 'catalog' }" :aria-current="view === 'catalog' ? 'page' : undefined" title="分类管理" @click="view = 'catalog'"><span class="nav-icon" aria-hidden="true">▦</span><span v-if="!collapsed">分类管理</span></button>
         <button :class="{ active: view === 'import' }" :aria-current="view === 'import' ? 'page' : undefined" title="基本图导入 / 预览" @click="view = 'import'"><span class="nav-icon" aria-hidden="true">▤</span><span v-if="!collapsed">基本图导入 / 预览</span></button>

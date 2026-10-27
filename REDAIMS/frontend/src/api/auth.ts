@@ -6,7 +6,7 @@ export interface AuthAdapter {
   logout(): Promise<void>
   restore(): Session | null
 }
-const key = 'redams.local-session'
+const key = 'redaims.local-session'
 export const auth: AuthAdapter = {
   async login(displayName = '') {
     const session: Session = { displayName: displayName.trim() || '本地用户', mode: 'local' }
