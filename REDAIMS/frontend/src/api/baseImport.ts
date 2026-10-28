@@ -19,9 +19,29 @@ export type EditField = 'arrival' | 'departure' | 'track_code' | 'visit_seq'
 export interface Change { event_id: string; field: EditField; value: string | number | null }
 export interface EditValidation { can_save: boolean; validation_token: string; change_count: number; issues: ValidationIssue[]; date_base_change?: { before: string; after: string } | null; train_date_changes: { train_course_id: string; before: string; after: string }[] }
 export async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/v1${url}`, options)
-  const data = await response.json()
-  if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail))
+  const path = `/api/v1${url}`, method = options?.method?.toUpperCase() || 'GET'
+  const response = await fetch(path, options)
+  if (response.status === 204) return undefined as T
+  const body = await response.text()
+  const context = `HTTP ${response.status}，${method} ${path}`
+  let data: unknown
+  try { data = JSON.parse(body) }
+  catch {
+    let hint = '请检查后端服务及 /api/ 反向代理配置。'
+    if (response.status === 413) hint = '请求体超过服务器或代理的大小限制；如使用 Nginx，请检查 client_max_body_size。'
+    else if ([502, 503, 504].includes(response.status)) hint = '请检查后端服务是否正常运行，以及反向代理的连接和超时日志。'
+    else if ([404, 405].includes(response.status)) hint = '请检查后端代码是否已更新并重启，以及 /api/ 是否正确代理到后端。'
+    else if (response.status >= 500) hint = '后端处理失败，请查看 Python 后端服务的异常日志。'
+    else if (response.ok || response.redirected) hint = 'API 请求可能被转到了前端页面或登录页，请检查 /api/ 代理及重定向配置。'
+    const contentType = response.headers.get('content-type') || '未提供 Content-Type'
+    const problem = body.trim() ? '返回内容不是有效 JSON' : '返回内容为空'
+    throw new Error(`请求失败（${context}）：${problem}（${contentType}）。${hint}`)
+  }
+  if (!response.ok) {
+    const detail = data && typeof data === 'object' && 'detail' in data ? data.detail : undefined
+    const message = typeof detail === 'string' ? detail : detail == null ? '请求失败' : JSON.stringify(detail)
+    throw new Error(`${message}（${context}）`)
+  }
   return data as T
 }
 export const post = <T>(url: string, body: object) => request<T>(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

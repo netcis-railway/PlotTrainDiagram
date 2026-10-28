@@ -50,3 +50,51 @@
 组件接收 text（按用户选择编码解码的日志全文）、filename、state（JSON展示配置），通过 update:state 事件返回可持久化的筛选、坐标、布局等配置。节点保存及回看负责传递/恢复state。后续Python或其他语言的日志处理可加服务端适配，前端按这一组件契约接收结果；当前不解析求解器字段、不生成模拟可视化。
 
 UTF-8（含BOM）与GB18030/GBK可切换。编码不能严格解码时提示用户切换，不替换损坏字符后保存。搜索按文本筛选行并保留原行号，日志按纯文本渲染。原文件下载保留原始字节。
+
+## Linux 保存视图报 JSON 解析错误
+
+“JSON.parse: unexpected character at line 1 column 1”表示收到的响应不能解析为JSON；仅凭这条信息不能判定保存失败的根因。保存运行图会上传完整绘图快照及已读取的延误数据，可能超过代理的请求体大小限制。Windows开发模式直连与Linux经反向代理访问可能因此表现不同。
+
+前端现在会显示HTTP状态码、请求地址及响应类型，并保留后端原有JSON错误说明。HTML错误页、纯文本错误和意外空响应不会再掩盖成JSON解析异常，也不会作为保存成功处理或自动重试。
+
+在浏览器F12的“网络 / Network”面板重新保存，检查 `POST /api/v1/runs/<run_id>/analysis-nodes`；旧版独立运行图窗口使用 `POST /api/v1/runs/<run_id>/diagram-views`。记录该请求的状态码、响应头Content-Type和响应内容：
+
+| 响应 | 排查方向 |
+| --- | --- |
+| 413，响应为HTML或纯文本 | 检查Nginx或其他代理的请求体大小限制。 |
+| 413，JSON说明快照超过32MB | 已到达Python接口，触发应用自身的快照上限；增大代理限制不会取消此上限。 |
+| 404 / 405 | 核对Linux后端代码和运行进程是否更新，确认 `/api/` 路由代理到Python服务。 |
+| 500 | 查看Python后端的完整异常日志，按具体异常检查数据库、目录权限等。 |
+| 502 / 503 / 504 | 检查后端是否启动、代理目标端口及连接/超时日志。 |
+| 200但响应是HTML | 请求可能落入前端静态页面、登录页或错误重写，需要修复API代理/重定向。 |
+
+Nginx的 `client_max_body_size` 默认是 `1m`，超过时返回413；官方说明见 [Nginx请求体大小限制](https://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size)。如果确认是Nginx拒绝，在处理REDAIMS API的现有 `server` 或 `location /api/` 配置块中设置：
+
+```nginx
+client_max_body_size 40m;
+```
+
+40m为应用32MB快照上限及请求外层字段留出空间。若存在多层代理，需要核对实际拦截请求的那一层；更具体的location配置可能覆盖server设置。保存的快照包含当前已读取的完整绘图数据，单纯取消勾选车次不一定缩小请求。
+
+在Linux服务器先检查配置：
+
+```bash
+sudo nginx -t
+```
+
+仅在检查成功后重新加载；使用systemd管理Nginx时执行：
+
+```bash
+sudo systemctl reload nginx
+```
+
+代理端口按实际部署保持配置。若配置 `/api/` 的 `proxy_pass`，需要保留后端所需的 `/api/v1/...` 路径；例如 `proxy_pass http://127.0.0.1:8000;` 保留请求路径，不能随意在该地址末尾增加 `/`。
+
+后端连通性可在服务器本机检查（端口按实际部署修改）：
+
+```bash
+curl -i http://127.0.0.1:8000/api/v1/health
+curl -i http://127.0.0.1:8000/api/v1/analysis/nodes
+```
+
+同步前端修改后，开发模式重启前端并刷新；静态部署重新执行 `npm run build` 并更新实际站点的dist文件。若仍保存失败，按新的HTTP状态及后端/代理日志继续定位，不能仅通过本地Windows保存成功确认Linux环境正常。
