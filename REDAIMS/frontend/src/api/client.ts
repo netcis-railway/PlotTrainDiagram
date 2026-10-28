@@ -18,6 +18,9 @@ export const api = {
   notes: (id: string, notes: string) => request(`/catalog/${id}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes }),
   }),
+  update: (id: string, changes: { name?: string; notes?: string }) => request<CatalogNode>(`/catalog/${encodeURIComponent(id)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes),
+  }),
 }
 
 export interface DeletionPreview {

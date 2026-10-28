@@ -62,9 +62,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.patch("/api/v1/catalog/{node_id}", tags=["catalog"])
     def patch_catalog(node_id: str, payload: CatalogPatch):
         try:
-            return catalog.update_notes(node_id, payload.notes)
+            return catalog.update(node_id, payload)
         except LookupError as error:
             raise HTTPException(404, str(error)) from error
+        except FileExistsError as error:
+            raise HTTPException(409, str(error)) from error
 
     @application.post(
         "/api/v1/ingest/inspect",

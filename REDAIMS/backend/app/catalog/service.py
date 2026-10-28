@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import uuid4
 
 from app.storage.database import Database
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Kind = Literal["user", "network", "scenario", "case", "algorithm", "batch"]
 PARENTS = {
@@ -35,7 +35,23 @@ class CatalogCreate(BaseModel):
 
 class CatalogPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    notes: str = Field(max_length=20000)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    notes: str | None = Field(default=None, max_length=20000)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str:
+        if value is None or not value.strip():
+            raise ValueError("名称不能为空")
+        return value.strip()
+
+    @model_validator(mode="after")
+    def require_changes(self):
+        if not self.model_fields_set:
+            raise ValueError("请提供名称或备注")
+        if "notes" in self.model_fields_set and self.notes is None:
+            raise ValueError("备注不能为null，请使用空字符串清空备注")
+        return self
 
 
 class CatalogDelete(BaseModel):
@@ -89,15 +105,28 @@ class CatalogService:
             )
         return {"id": node_id, **payload.model_dump()}
 
-    def update_notes(self, node_id: str, notes: str):
+    def update(self, node_id: str, payload: CatalogPatch):
         with self.database.transaction() as connection:
             row = connection.execute(
-                "UPDATE catalog_nodes SET notes = ? WHERE id = ? RETURNING id",
-                [notes, node_id],
+                "SELECT id,kind,parent_id,name,notes FROM catalog_nodes WHERE id=?", [node_id]
             ).fetchone()
             if row is None:
                 raise LookupError("分类节点不存在")
-        return {"id": node_id, "notes": notes}
+            changes = payload.model_dump(exclude_unset=True)
+            name, notes = changes.get("name", row[3]), changes.get("notes", row[4])
+            if (
+                name != row[3]
+                and connection.execute(
+                    "SELECT 1 FROM catalog_nodes WHERE parent_id IS NOT DISTINCT FROM ? "
+                    "AND kind=? AND name=? AND id<>?",
+                    [row[2], row[1], name, node_id],
+                ).fetchone()
+            ):
+                raise FileExistsError("同一父节点下名称已存在")
+            connection.execute(
+                "UPDATE catalog_nodes SET name=?,notes=? WHERE id=?", [name, notes, node_id]
+            )
+        return {"id": node_id, "kind": row[1], "parent_id": row[2], "name": name, "notes": notes}
 
     def _impact(self, connection, node_id: str):
         nodes = connection.execute(

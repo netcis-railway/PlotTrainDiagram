@@ -73,6 +73,7 @@ const parentId = ref('')
 const name = ref('')
 const notes = ref('')
 const draftNotes = ref('')
+const draftName = ref('')
 const status = ref('正在连接')
 const error = ref('')
 const busy = ref(false)
@@ -267,7 +268,7 @@ function setCurrent(node: CatalogNode) {
   viewGeneration++; viewLoading.value = false; openedView.value = null; selectedViewId.value = ''
   selectedAnalysisId.value = ''; selectedLogId.value = ''; openedAnalysis.value = null; openedLogId.value = ''
   actionRequest.value = undefined; selectedBaseId.value = ''; selected.value = node.id
-  draftNotes.value = node.notes
+  draftName.value = node.name; draftNotes.value = node.notes
 }
 function select(entry: CatalogTreeNode, openView = true) {
   closeContextMenu()
@@ -303,17 +304,23 @@ function changeKind() {
   parentId.value = ancestor?.id ?? ''
   if (ancestor) setCurrent(ancestor)
 }
-async function saveNotes() {
-  if (!current.value) return
+async function saveCategory() {
+  if (busy.value || !current.value || current.value.kind === 'run' || selectedBaseId.value || isAnalysisChild.value) return
+  const newName = draftName.value.trim()
+  if (!newName) { error.value = '类别名称不能为空'; return }
   busy.value = true; error.value = ''
   const targetId = current.value.id
-  const value = draftNotes.value
+  const changes = { name: newName, notes: draftNotes.value }
   try {
-    await api.notes(targetId, value)
-    const target = nodes.value.find(node => node.id === targetId)
-    if (target) target.notes = value
+    const saved = await api.update(targetId, changes)
+    nodes.value = nodes.value.map(node => node.id === targetId ? { ...node, ...saved } : node)
+    if (selectedTreeId.value === targetId) {
+      draftName.value = saved.name; draftNotes.value = saved.notes
+      status.value = `已保存类别：${saved.name}`
+    }
+    await refreshResolution()
   }
-  catch (e) { error.value = String(e) } finally { busy.value = false }
+  catch (e) { if (selectedTreeId.value === targetId) error.value = String(e) } finally { busy.value = false }
 }
 async function afterDelete() { selectedAnalysisId.value = ''; selectedLogId.value = ''; openedAnalysis.value = null; openedLogId.value = ''; selectedViewId.value = ''; selectedBaseId.value = ''; selected.value = ''; parentId.value = ''; kind.value = 'user'; activeTab.value = 'view'; await refresh() }
 let targetVersion = 0
@@ -365,8 +372,9 @@ onUnmounted(() => { viewGeneration++; viewListVersion++; window.removeEventListe
             <h2>查看编辑：{{ selectedAnalysis ? analysisLabels[selectedAnalysis.node_type] + ' ' + selectedAnalysis.name : selectedLog ? '求解日志 ' + selectedLog.filename : selectedDiagramView ? '视图 ' + selectedDiagramView.name : selectedBase ? '基本图 ' + selectedBase.name : labels[current.kind] + ' ' + current.name }}</h2>
             <p class="category-context"><strong>完整分类路径：</strong>{{ selectedBase || isAnalysisChild ? treePath(selectedTreeId) : currentPath }}</p>
             <div class="catalog-actions" role="group" aria-label="所选条目操作"><strong>操作</strong><button v-for="action in actions" :key="action.id" type="button" :disabled="busy || action.disabled" :title="action.title" :class="{ danger: action.danger }" @click="performAction(action.id)">{{ action.label }}</button></div>
-            <form v-if="!selectedBase && current.kind !== 'run'" @submit.prevent="saveNotes">
-              <label>分类备注<textarea v-model="draftNotes" maxlength="20000" /></label><button :disabled="busy">保存备注</button>
+            <form v-if="!selectedBase && !isAnalysisChild && current.kind !== 'run'" aria-label="编辑分类" @submit.prevent="saveCategory">
+              <label>类别名称<input v-model="draftName" required maxlength="200" :disabled="busy" /></label>
+              <label>分类备注<textarea v-model="draftNotes" maxlength="20000" :disabled="busy" /></label><button :disabled="busy || !draftName.trim()">{{ busy ? '正在保存…' : '保存修改' }}</button>
             </form>
             <BaseDiagramInfo v-if="selectedBase" :key="selectedBase.id + editorKey" :base-id="selectedBase.id" :scope-path="currentPath" :resolution="resolution" :nodes="nodes" :action-request="actionRequest" @changed="afterDataChanged" />
             <template v-else-if="current.kind === 'run'">
