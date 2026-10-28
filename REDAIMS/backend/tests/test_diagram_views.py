@@ -117,6 +117,38 @@ def test_real_plot_roundtrip_preserves_overlay_selections_drafts_and_later_sourc
         assert again["snapshot"]["data"]["base"]["name"] == base["name"]
 
 
+def test_display_modes_roundtrip_with_empty_checked_selection(tmp_path):
+    settings = Settings(database=tmp_path / "display.duckdb")
+    with TestClient(create_app(settings)) as client:
+        ids = branch(client, "display")
+        seed(client.app, ids[-1])
+        body = payload()
+        body["state"]["train_keys"] = []
+        body["state"]["display"] = {
+            "only_highlighted": True,
+            "train_sources": {
+                "base:base1": {"enabled": True, "mode": "all"},
+                "run:run1": {"enabled": False, "mode": "selected"},
+            },
+        }
+        response = post(client, body)
+        assert response.status_code == 201, response.text
+        view_id = response.json()["id"]
+        bad = deepcopy(body)
+        bad["name"] = "非法模式"
+        bad["state"]["display"]["train_sources"]["run:run1"]["mode"] = "invalid"
+        assert post(client, bad).status_code == 422
+    with TestClient(create_app(settings)) as client:
+        saved = client.get(f"/api/v1/runs/run1/diagram-views/{view_id}").json()
+        assert saved["state"]["train_keys"] == []
+        assert saved["state"]["display"]["only_highlighted"] is True
+        assert (
+            saved["state"]["display"]["train_sources"]
+            == body["state"]["display"]["train_sources"]
+        )
+        assert saved["snapshot"] == body["snapshot"]
+
+
 def test_view_names_scoping_and_invalid_state_are_checked(tmp_path, monkeypatch):
     app = create_app(Settings(database=tmp_path / "views.duckdb"))
     with TestClient(app) as client:

@@ -12,12 +12,13 @@ export interface PlotSegment { from: number; to: number; kind: 'dwell' | 'travel
 export interface PlotSeries { key: string; object_type: 'base' | 'run'; object_id: string; object_name: string; run_no?: number | null; train_id: string; train_course_id: string; train_base_date: string; direction: 'down' | 'up' | 'unknown'; points: PlotPoint[]; segments: PlotSegment[]; events: PlotEvent[] }
 export interface PlotStyles { down: string; up: string; unknown: string; base: string; base_dark: string; grid: string; highlight: string; width: number; point_radius: number; grid_minutes: number; font_size: number; track_gap: number; track_yita_seconds: number; train_styles: Record<string, { color: string | null; width: number | null; dashed: boolean }> }
 export interface PlotData { track_stations: TrackResource[]; expanded_stations: string[]; object: EditorData['object']; revision: string; base: PlotBase | null; line_ind: number; axis_revision: string; axis: { stations: PlotStation[]; total: number; unit: string }; series: PlotSeries[]; preview: boolean; preview_changes: number; can_plot: boolean; overlay_base: boolean; time_extent: [number, number] | null; styles: PlotStyles; style_source: string; issues: PlotIssue[]; operation_id: string; log_written: boolean }
+export interface TrainSourceDisplay { enabled: boolean; mode: 'all' | 'selected' }
 export interface DiagramViewState {
   version: 1; line_ind: number; overlay_base: boolean; reverse: boolean
   station_ids: string[]; train_keys: string[]; highlighted_keys: string[]; expanded_station_ids: string[]
   track_station: string; viewport: { x0: number; x1: number; y0: number; y1: number }
   from_time: string; to_time: string; detail_open: boolean; chart_height: number
-  display?: { station_search: string; train_search: string; open_panels: string[] }
+  display?: { station_search: string; train_search: string; open_panels: string[]; only_highlighted?: boolean; train_sources?: Record<string, TrainSourceDisplay> }
 }
 export interface DiagramViewSummary { id: string; run_id: string; name: string; created_at: string; line_ind: number; station_count: number; train_count: number; highlight_count: number }
 export interface CreateDiagramView { name: string; state: DiagramViewState; snapshot: { context: PlotContext; data: PlotData } }

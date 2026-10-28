@@ -216,7 +216,22 @@ a { color: var(--primary); }
 .diagram-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; position: sticky; top: -18px; z-index: 3; padding: 10px 0; background: var(--surface); border-bottom: 1px solid var(--border); }
 .diagram-heading h2 { margin: 0; }.diagram-context { font-size: 12px; padding: 10px 0; line-height: 1.8; }.diagram-context p { margin: 3px 0; }
 .diagram-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 10px 0; }.diagram-controls > label:first-child { min-width: 220px; }.diagram-controls .confirmation { padding-bottom: 10px; }
-.diagram-filters { display: flex; gap: 12px; flex-wrap: wrap; margin: 14px 0; }.diagram-filters > details { flex: 1; min-width: 230px; border: 1px solid var(--border); border-radius: 6px; padding: 10px; }.diagram-filters summary, .diagram-dialog details > summary { cursor: pointer; }.diagram-filters input:not([type='checkbox']) { margin: 8px 0; }
+.diagram-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: start; margin: 14px 0; }.diagram-filters > details { min-width: 0; border: 1px solid var(--border); border-radius: 6px; padding: 10px; }.diagram-filters summary, .diagram-dialog details > summary { cursor: pointer; }.diagram-filters input:not([type='checkbox']):not([type='radio']) { margin: 8px 0; }
+.diagram-filters > .diagram-station-filter { flex: 0 0 166px; max-width: 100%; }
+.diagram-station-actions, .diagram-source-actions { display: flex; gap: 6px; white-space: nowrap; }
+.diagram-filters > .diagram-train-filter { flex: 1 1 420px; }
+.diagram-filters > .diagram-time-filter { flex: 0 0 248px; max-width: 100%; }
+.diagram-time-filter input { min-width: 0; padding: 8px 6px; font-variant-numeric: tabular-nums; }
+.diagram-train-toolbar-wrap { overflow-x: auto; margin-top: 10px; }
+table.diagram-train-toolbar { width: 100%; border-collapse: collapse; }
+.diagram-train-toolbar th, .diagram-train-toolbar td { position: static; min-width: 0; padding: 6px; text-align: left; vertical-align: top; background: var(--surface); }
+.diagram-train-toolbar th { font-weight: 400; }
+.diagram-train-toggle, .diagram-train-modes, .diagram-train-modes label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.diagram-train-toolbar input[type='checkbox'], .diagram-train-toolbar input[type='radio'] { width: auto; margin: 0; }
+.diagram-train-modes { gap: 10px; margin-top: 6px; }
+.diagram-train-search { width: 100%; }
+.diagram-train-search input { min-width: 140px; }
+@media (max-width: 760px) { .diagram-filters > .diagram-train-filter { flex-basis: 100%; order: 1; } .diagram-filters > .diagram-time-filter { margin-left: auto; } }
 .diagram-filters button { font-size: 12px; padding: 6px 10px; }.diagram-filters .diagram-inspect { margin-left: auto; }.diagram-legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 12px; }.diagram-down { color: #d64444; }.diagram-up { color: #287ac4; }
 .diagram-instruction, .diagram-range { font-size: 12px; margin: 8px 0; }.diagram-canvas-shell { width: 100%; height: clamp(340px, 58vh, 760px); position: relative; margin: 10px 0; border: 1px solid var(--border); }
 .diagram-canvas-shell canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }.diagram-canvas-shell canvas:active { cursor: grabbing; }

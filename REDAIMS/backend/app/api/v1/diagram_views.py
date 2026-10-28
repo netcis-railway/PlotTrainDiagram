@@ -33,10 +33,18 @@ class Viewport(BaseModel):
         return self
 
 
+class TrainSourceDisplay(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    mode: Literal["all", "selected"] = "selected"
+
+
 class DiagramDisplay(BaseModel):
     model_config = ConfigDict(extra="forbid")
     station_search: str = Field(default="", max_length=1000)
     train_search: str = Field(default="", max_length=1000)
+    only_highlighted: bool = False
+    train_sources: dict[str, TrainSourceDisplay] = Field(default_factory=dict, max_length=1000)
     open_panels: list[
         Literal["stations", "trains", "time", "tracks", "details-trains", "styles", "issues"]
     ] = Field(default_factory=list, max_length=7)
@@ -49,7 +57,7 @@ class ViewState(BaseModel):
     overlay_base: bool
     reverse: bool
     station_ids: list[str] = Field(min_length=1, max_length=10000)
-    train_keys: list[str] = Field(min_length=1, max_length=20000)
+    train_keys: list[str] = Field(max_length=20000)
     highlighted_keys: list[str] = Field(max_length=20000)
     expanded_station_ids: list[str] = Field(max_length=10000)
     track_station: str = ""

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
 import { formatPath, type Change } from '../api/baseImport'
-import { diagramApi, type PlotContext, type PlotData, type PlotSeries, type PlotIssue, type SavedDiagramView, type DiagramViewSummary, type CreateDiagramView } from '../api/diagram'
+import { diagramApi, type PlotContext, type PlotData, type PlotSeries, type PlotIssue, type SavedDiagramView, type DiagramViewSummary, type CreateDiagramView, type TrainSourceDisplay } from '../api/diagram'
 import { fitViewport, localTime, timeLabel, timeRange, zoomViewport, type Viewport } from '../diagramGeometry'
 import { orderPlotTrains } from '../diagramTrainOrdering'
 import DiagramCanvas from './DiagramCanvas.vue'
@@ -11,6 +11,22 @@ const emit = defineEmits<{ close: []; viewSaved: [view: DiagramViewSummary]; req
 const dialog = ref<HTMLDialogElement | null>(null), previousFocus = document.activeElement as HTMLElement | null
 const context = ref<PlotContext | null>(null), data = ref<PlotData | null>(null), busy = ref(false), error = ref('')
 const line = ref(''), overlay = ref(false), reverse = ref(false), stationIds = ref<string[]>([]), trainIds = ref<string[]>([]), selected = ref<string[]>([])
+const onlyHighlighted = ref(false), sourceDisplay = ref<Record<string, TrainSourceDisplay>>({}), controlId = useId()
+interface TrainSource { key: string; objectType: 'base' | 'run'; label: string; name: string; runNo: number; keys: string[]; available: boolean }
+function sourceKey(series: PlotSeries) { return `${series.object_type}:${series.object_id}` }
+function sourceMode(key: string) { return sourceDisplay.value[key]?.mode || 'selected' }
+function sourceEnabled(source: TrainSource) { return source.objectType === 'base' && props.objectType === 'run' ? overlay.value : sourceDisplay.value[source.key]?.enabled !== false }
+function setSourceEnabled(source: TrainSource, enabled: boolean) {
+  sourceDisplay.value = { ...sourceDisplay.value, [source.key]: { enabled, mode: sourceMode(source.key) } }
+  if (source.objectType === 'base' && props.objectType === 'run') overlay.value = enabled
+}
+function setSourceMode(source: TrainSource, mode: TrainSourceDisplay['mode']) {
+  sourceDisplay.value = { ...sourceDisplay.value, [source.key]: { enabled: sourceEnabled(source), mode } }
+}
+function selectSource(source: TrainSource, all: boolean) {
+  const keys = new Set(source.keys)
+  trainIds.value = all ? [...new Set([...trainIds.value, ...source.keys])] : trainIds.value.filter(key => !keys.has(key))
+}
 const stationSearch = ref(''), trainSearch = ref(''), from = ref(''), to = ref(''), logText = ref(''), detailOpen = ref(false)
 const expanded = ref<string[]>([]), trackStation = ref('')
 const openPanels = ref<string[]>([])
@@ -25,7 +41,31 @@ const viewport = ref<Viewport>({ x0: 0, x1: 3600, y0: 0, y1: 1000 })
 let generation = 0, styleTimer: number | undefined, loadingStyles = false
 const styleIssues = ref<PlotIssue[]>([]), styleLogWritten = ref(true)
 const hasDraft = computed(() => props.changes.length > 0 || props.dateBase !== props.originalDateBase)
-const displayed = computed(() => data.value?.series.filter(series => trainIds.value.includes(series.key) && (!snapshotMode.value || overlay.value || series.object_type !== 'base')) || [])
+const trainSources = computed(() => {
+  const sources = new Map<string, TrainSource>()
+  function add(objectType: 'base' | 'run', id: string, name: string, runNo?: number | null) {
+    const key = `${objectType}:${id}`
+    if (!sources.has(key)) sources.set(key, { key, objectType, label: objectType === 'base' ? '基本图' : runNo == null ? name || 'run' : `run_${runNo}`, name, runNo: runNo ?? Infinity, keys: [], available: objectType !== 'base' || props.objectType === 'base' || !!data.value?.overlay_base })
+  }
+  if (data.value) {
+    const object = data.value.object
+    add(props.objectType, object.id, object.name, object.run_no)
+    if (props.objectType === 'run' && data.value.base) add('base', data.value.base.id, data.value.base.name)
+    for (const series of data.value.series) {
+      add(series.object_type, series.object_id, series.object_name, series.run_no ?? (series.object_id === object.id ? object.run_no : undefined))
+      sources.get(sourceKey(series))!.keys.push(series.key)
+    }
+  }
+  return [...sources.values()].sort((a, b) => (a.objectType === 'base' ? 0 : 1) - (b.objectType === 'base' ? 0 : 1) || a.runNo - b.runNo || a.key.localeCompare(b.key))
+})
+const displayed = computed(() => {
+  const sources = new Map(trainSources.value.map(source => [source.key, source]))
+  const checked = new Set(trainIds.value), highlighted = new Set(selected.value)
+  return data.value?.series.filter(series => {
+    const source = sources.get(sourceKey(series))
+    return source && sourceEnabled(source) && (onlyHighlighted.value ? highlighted.has(series.key) : sourceMode(source.key) === 'all' || checked.has(series.key))
+  }) || []
+})
 const stationOptions = computed(() => data.value?.axis.stations.filter(s => `${s.node_name_chn} ${s.node_name}`.includes(stationSearch.value)) || [])
 const orderedTrains = computed(() => orderPlotTrains(data.value?.series || [], data.value?.object))
 const trainOptions = computed(() => orderedTrains.value.filter(s => `${s.train_course_id} ${s.object_name} ${s.train_base_date}`.includes(trainSearch.value)))
@@ -56,7 +96,7 @@ async function loadData(reason: 'line' | 'overlay' | 'refresh' | 'tracks' | 'sty
   busy.value = true; error.value = ''; logText.value = ''
   try {
     const result = await diagramApi.data({ object_type: props.objectType, object_id: props.objectId, line_ind: Number(line.value),
-      revision: hasDraft.value ? props.revision : context.value.revision, overlay_base: overlay.value, expanded_stations: expanded.value,
+      revision: hasDraft.value ? props.revision : context.value.revision, overlay_base: context.value.overlay_available, expanded_stations: expanded.value,
       changes: hasDraft.value ? props.changes : [], date_base: hasDraft.value ? props.dateBase || undefined : undefined })
     if (version !== generation) return
     const incomingStations = result.axis.stations.map(s => s.node_id), incomingTrains = result.series.map(s => s.key)
@@ -131,6 +171,8 @@ function restoreSavedView(saved: SavedDiagramView) {
   viewport.value = { ...state.viewport }; from.value = state.from_time; to.value = state.to_time
   detailOpen.value = state.detail_open; restoredHeight.value = state.chart_height
   stationSearch.value = state.display?.station_search || ''; trainSearch.value = state.display?.train_search || ''; openPanels.value = [...(state.display?.open_panels || [])]
+  onlyHighlighted.value = state.display?.only_highlighted || false
+  sourceDisplay.value = JSON.parse(JSON.stringify(state.display?.train_sources || {}))
   styleIssues.value = snapshot.data.issues.filter(issue => issue.code === 'style_config')
   viewStatus.value = `已打开保存视图：${saved.name}`
 }
@@ -141,7 +183,6 @@ function openSaveView() {
 }
 function currentView(): CreateDiagramView | null {
   if (!context.value || !data.value || !ready.value || props.objectType !== 'run') return null
-  const retained = new Set([...trainIds.value, ...selected.value])
   return JSON.parse(JSON.stringify({
     name: viewName.value.trim() || '运行图',
     state: {
@@ -150,9 +191,10 @@ function currentView(): CreateDiagramView | null {
       expanded_station_ids: expanded.value, track_station: trackStation.value, viewport: viewport.value,
       from_time: from.value, to_time: to.value, detail_open: detailOpen.value,
       chart_height: canvasRef.value?.getHeight() || restoredHeight.value || 600,
-      display: { station_search: stationSearch.value, train_search: trainSearch.value, open_panels: openPanels.value },
+      display: { station_search: stationSearch.value, train_search: trainSearch.value, open_panels: openPanels.value,
+        only_highlighted: onlyHighlighted.value, train_sources: Object.fromEntries(trainSources.value.map(source => [source.key, { enabled: sourceEnabled(source), mode: sourceMode(source.key) }])) },
     },
-    snapshot: { context: context.value, data: { ...data.value, series: data.value.series.filter(series => retained.has(series.key)) } },
+    snapshot: { context: context.value, data: data.value },
   })) as CreateDiagramView
 }
 async function saveCurrentView() {
@@ -189,13 +231,22 @@ onUnmounted(() => { viewClosed = true; generation++; if (styleTimer) window.clea
   <template v-if="context"><div class="diagram-context"><span>{{ data?.preview ? `预览未保存草稿（${data.preview_changes}个单元格）` : '已保存的工作数据' }}</span> · 运行基准日 {{ data?.object.date_base || context.object.date_base || '无' }} · {{ objectType === 'base' ? '基本图' : 'run' }}直属类别：{{ formatPath(context.object.classification_path) }}
     <p>有效基本图：{{ context.base?.name || '无' }} {{ context.base?.baseTT_no || '' }} · {{ formatPath(context.base?.classification_path || []) }}</p></div>
     <div class="diagram-controls"><label>绘图线路<select v-model="line" :disabled="snapshotMode || busy || !context.lines.length" @change="loadData('line')"><option v-for="entry in context.lines" :key="entry.line_ind" :value="String(entry.line_ind)">{{ entry.line_name_chn }}（{{ entry.line_ind }}）{{ entry.available ? '' : ' · 资料不足' }}</option></select></label>
-      <label class="confirmation"><input v-model="reverse" type="checkbox" />逆序站轴</label><label v-if="objectType === 'run'" class="confirmation"><input v-model="overlay" type="checkbox" :disabled="busy || !context.base || (snapshotMode && !data?.overlay_base)" @change="loadData('overlay')" />叠加有效基本图</label>
+      <label class="confirmation"><input v-model="reverse" type="checkbox" />逆序站轴</label>
       <button :disabled="!data?.can_plot || busy" @click="viewport = zoomViewport(viewport, .8)">放大</button><button :disabled="!data?.can_plot || busy" @click="viewport = zoomViewport(viewport, 1.25)">缩小</button><button :disabled="!data?.can_plot || busy" @click="resetRange()">恢复自动范围</button>
     </div>
   </template>
-  <template v-if="data"><div class="diagram-filters"><details :open="openPanels.includes('stations')" @toggle="panel('stations', $event)"><summary>绘图车站（{{ stationIds.length }} / {{ data.axis.stations.length }}）</summary><input v-model="stationSearch" placeholder="筛选绘图车站" /><button @click="stationIds = data.axis.stations.map(s => s.node_id)">全选车站</button> <button @click="stationIds = []">清空车站</button><div class="checkbox-options"><label v-for="station in stationOptions" :key="station.node_id"><input v-model="stationIds" type="checkbox" :value="station.node_id" />{{ station.node_seq_of_line }} · {{ station.node_name_chn }}</label></div></details>
-    <details :open="openPanels.includes('trains')" @toggle="panel('trains', $event)"><summary>绘图列车（{{ trainIds.length }} / {{ data.series.length }}）</summary><input v-model="trainSearch" placeholder="筛选绘图车次或方案" /><button @click="trainIds = data.series.map(s => s.key)">全部显示</button> <button @click="trainIds = []">全部隐藏</button> <button :disabled="!selected.length" @click="trainIds = selected.slice()">只显示高亮列车</button><div class="checkbox-options diagram-train-options"><label v-for="(series, index) in trainOptions" :key="series.key" :class="{ 'diagram-train-divider': index > 0 && series.train_course_id.trim().toUpperCase() !== trainOptions[index - 1]?.train_course_id.trim().toUpperCase() }"><input v-model="trainIds" type="checkbox" :value="series.key" />{{ series.train_course_id }} · {{ series.object_type === 'base' ? '基本图' : series.object_name }} · {{ series.train_base_date }} <button class="diagram-inspect" @click="inspectSeries(series)">明细</button></label></div></details>
-    <details :open="openPanels.includes('time')" @toggle="panel('time', $event)"><summary>设置时间范围</summary><label>绘图开始时间<input v-model="from" type="datetime-local" step="1" /></label><label>绘图结束时间<input v-model="to" type="datetime-local" step="1" /></label><button @click="applyTime">应用时间范围</button></details></div>
+  <template v-if="data"><div class="diagram-filters"><details class="diagram-station-filter" :open="openPanels.includes('stations')" @toggle="panel('stations', $event)"><summary>绘图车站（{{ stationIds.length }} / {{ data.axis.stations.length }}）</summary><input v-model="stationSearch" placeholder="筛选绘图车站" /><div class="diagram-station-actions"><button @click="stationIds = data.axis.stations.map(s => s.node_id)">全选车站</button><button @click="stationIds = []">清空车站</button></div><div class="checkbox-options"><label v-for="station in stationOptions" :key="station.node_id"><input v-model="stationIds" type="checkbox" :value="station.node_id" />{{ station.node_seq_of_line }} · {{ station.node_name_chn }}</label></div></details>
+    <details class="diagram-train-filter" :open="openPanels.includes('trains')" @toggle="panel('trains', $event)"><summary>绘图列车（已选 {{ trainIds.length }} / {{ data.series.length }}，显示 {{ displayed.length }}）</summary>
+      <div class="diagram-train-toolbar-wrap"><table class="diagram-train-toolbar" aria-label="绘图列车显示与选择"><tbody>
+        <tr><th><label class="diagram-train-toggle" title="只显示已启用来源中的高亮列车，保留原勾选车次"><input v-model="onlyHighlighted" type="checkbox" />只显示高亮列车</label></th>
+          <th v-for="source in trainSources" :key="source.key" :data-source="source.key" scope="col"><label class="diagram-train-toggle" :title="source.name"><input type="checkbox" :checked="sourceEnabled(source)" :disabled="busy || !source.available" :aria-label="`显示${source.label}`" @change="setSourceEnabled(source, ($event.target as HTMLInputElement).checked)" />{{ source.label }}</label>
+            <div class="diagram-train-modes" role="radiogroup" :aria-label="`${source.label}显示范围`"><label><input type="radio" :name="`${controlId}-${source.key}`" value="all" :checked="sourceMode(source.key) === 'all'" :disabled="busy || !source.available" @change="setSourceMode(source, 'all')" />全部</label><label><input type="radio" :name="`${controlId}-${source.key}`" value="selected" :checked="sourceMode(source.key) === 'selected'" :disabled="busy || !source.available" @change="setSourceMode(source, 'selected')" />所选车次</label></div>
+          </th><th class="diagram-train-search"><input v-model="trainSearch" aria-label="筛选绘图车次或方案" placeholder="筛选车次或方案" /></th></tr>
+        <tr><td></td><td v-for="source in trainSources" :key="source.key" :data-source="source.key"><div class="diagram-source-actions"><button type="button" :disabled="busy || !source.available" :aria-label="`${source.label}全选`" @click="selectSource(source, true)">全选</button><button type="button" :disabled="busy || !source.available" :aria-label="`${source.label}全不选`" @click="selectSource(source, false)">全不选</button></div></td><td></td></tr>
+      </tbody></table></div>
+      <div class="checkbox-options diagram-train-options"><label v-for="(series, index) in trainOptions" :key="series.key" :class="{ 'diagram-train-divider': index > 0 && series.train_course_id.trim().toUpperCase() !== trainOptions[index - 1]?.train_course_id.trim().toUpperCase() }"><input v-model="trainIds" type="checkbox" :value="series.key" />{{ series.train_course_id }} · {{ series.object_type === 'base' ? '基本图' : series.object_name }} · {{ series.train_base_date }} <button class="diagram-inspect" @click="inspectSeries(series)">明细</button></label></div>
+    </details>
+    <details class="diagram-time-filter" :open="openPanels.includes('time')" @toggle="panel('time', $event)"><summary>设置时间范围</summary><label>绘图开始时间<input v-model="from" type="datetime-local" step="1" /></label><label>绘图结束时间<input v-model="to" type="datetime-local" step="1" /></label><button @click="applyTime">应用时间范围</button></details></div>
     <details class="track-controls" :open="openPanels.includes('tracks')" @toggle="panel('tracks', $event)"><summary>车站股道信息与展开（{{ expanded.length }}站已展开）</summary>
       <div class="diagram-controls"><label>股道展开车站<select v-model="trackStation" :disabled="busy"><option v-for="resource in data.track_stations" :key="resource.node_id" :value="resource.node_id">{{ resource.node_name_chn }}{{ resource.can_expand ? ` · ${resource.track_count}条股道` : ' · 无可展开股道' }}</option></select></label>
         <button :disabled="snapshotMode || busy || !trackStation" @click="toggleTrack(trackStation)">{{ expanded.includes(trackStation) ? '收起本站股道' : '展开本站股道' }}</button>
