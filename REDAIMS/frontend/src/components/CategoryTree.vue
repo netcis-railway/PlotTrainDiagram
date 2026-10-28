@@ -101,10 +101,23 @@ function keydown(event: KeyboardEvent, index: number) {
       <button v-if="row.expandable" class="tree-chevron" type="button" tabindex="-1" :aria-label="`${collapsed.has(row.node.id) ? '展开' : '折叠'} ${row.node.name}`" @click.stop="toggle(row.node.id)" @dblclick.stop>
         <svg viewBox="0 0 16 16" aria-hidden="true" :class="{ expanded: !collapsed.has(row.node.id) }"><path d="m6 3 5 5-5 5" /></svg>
       </button><span v-else class="tree-chevron-placeholder" aria-hidden="true" />
-      <svg v-if="row.node.kind === 'run' || row.node.baseReference || analysisLetter(row.node)" class="tree-diagram" :class="{ 'tree-analysis-delay': analysisLetter(row.node) === 'D', 'tree-analysis-log': analysisLetter(row.node) === 'S' }" viewBox="0 0 20 18" aria-hidden="true">
-        <path d="M3 1h9l5 5v11H3Z M12 1v5h5" />
-        <text v-if="analysisLetter(row.node)" class="tree-document-letter" x="10" y="13.5" text-anchor="middle">{{ analysisLetter(row.node) }}</text>
-        <path v-else d="M6 13l3-4 3 3 3-4" />
+      <svg v-if="row.node.kind === 'run' || row.node.baseReference || analysisLetter(row.node)" class="tree-diagram" :class="{ 'tree-base': !!row.node.baseReference, 'tree-analysis-view': analysisLetter(row.node) === 'V', 'tree-analysis-delay': analysisLetter(row.node) === 'D', 'tree-analysis-log': analysisLetter(row.node) === 'S' }" viewBox="0 0 20 18" aria-hidden="true">
+        <template v-if="row.node.baseReference">
+          <rect x="3" y="1" width="14" height="16" />
+          <text class="tree-document-letter" x="10" y="13.5" text-anchor="middle">B</text>
+        </template>
+        <template v-else-if="analysisLetter(row.node) === 'V'">
+          <path d="M3 1h9l5 5v11H3Z M12 1v5h5" />
+          <path d="M6 13l3-4 3 3 3-4" />
+        </template>
+        <template v-else-if="analysisLetter(row.node)">
+          <path d="M3 1h9l5 5v11H3Z M12 1v5h5" />
+          <text class="tree-document-letter" x="10" y="13.5" text-anchor="middle">{{ analysisLetter(row.node) }}</text>
+        </template>
+        <template v-else>
+          <path d="M8 1h9v16H3V6Z M3 6h5V1" />
+          <g class="tree-timetable-grid"><rect x="5" y="8" width="10" height="7.5" /><path d="M10 8v7.5 M5 10.5h10 M5 13h10" /></g>
+        </template>
       </svg>
       <svg v-else class="tree-folder" viewBox="0 0 20 18" aria-hidden="true"><path v-if="row.expandable && !collapsed.has(row.node.id)" d="M2 6V3h6l2 2h7v2M2 7h17l-3 9H2Z" /><path v-else d="M2 3h6l2 2h8v11H2Z" /></svg>
       <span class="tree-name">{{ row.node.name }}</span><small class="tree-kind">{{ row.node.logReference ? '求解日志' : row.node.analysisReference ? ({ view: '视图', 'solver-log': '求解日志', delay: '延误分析' })[row.node.analysisReference.nodeType] : row.node.viewReference ? '视图' : row.node.baseReference ? '基本图' : labels[row.node.kind] }}</small>

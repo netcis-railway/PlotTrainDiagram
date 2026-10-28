@@ -11,7 +11,7 @@ const emit = defineEmits<{ close: []; viewSaved: [view: DiagramViewSummary]; req
 const dialog = ref<HTMLDialogElement | null>(null), previousFocus = document.activeElement as HTMLElement | null
 const context = ref<PlotContext | null>(null), data = ref<PlotData | null>(null), busy = ref(false), error = ref('')
 const line = ref(''), overlay = ref(false), reverse = ref(false), stationIds = ref<string[]>([]), trainIds = ref<string[]>([]), selected = ref<string[]>([])
-const onlyHighlighted = ref(false), sourceDisplay = ref<Record<string, TrainSourceDisplay>>({}), controlId = useId()
+const sourceDisplay = ref<Record<string, TrainSourceDisplay>>({}), controlId = useId()
 interface TrainSource { key: string; objectType: 'base' | 'run'; label: string; name: string; runNo: number; keys: string[]; available: boolean }
 function sourceKey(series: PlotSeries) { return `${series.object_type}:${series.object_id}` }
 function sourceMode(key: string) { return sourceDisplay.value[key]?.mode || 'selected' }
@@ -26,6 +26,11 @@ function setSourceMode(source: TrainSource, mode: TrainSourceDisplay['mode']) {
 function selectSource(source: TrainSource, all: boolean) {
   const keys = new Set(source.keys)
   trainIds.value = all ? [...new Set([...trainIds.value, ...source.keys])] : trainIds.value.filter(key => !keys.has(key))
+}
+function showHighlightedTrains() {
+  const available = new Set(data.value?.series.map(series => series.key) || [])
+  trainIds.value = selected.value.filter(key => available.has(key))
+  for (const source of trainSources.value) setSourceMode(source, 'selected')
 }
 const stationSearch = ref(''), trainSearch = ref(''), from = ref(''), to = ref(''), logText = ref(''), detailOpen = ref(false)
 const expanded = ref<string[]>([]), trackStation = ref('')
@@ -60,10 +65,10 @@ const trainSources = computed(() => {
 })
 const displayed = computed(() => {
   const sources = new Map(trainSources.value.map(source => [source.key, source]))
-  const checked = new Set(trainIds.value), highlighted = new Set(selected.value)
+  const checked = new Set(trainIds.value)
   return data.value?.series.filter(series => {
     const source = sources.get(sourceKey(series))
-    return source && sourceEnabled(source) && (onlyHighlighted.value ? highlighted.has(series.key) : sourceMode(source.key) === 'all' || checked.has(series.key))
+    return source && sourceEnabled(source) && (sourceMode(source.key) === 'all' || checked.has(series.key))
   }) || []
 })
 const stationOptions = computed(() => data.value?.axis.stations.filter(s => `${s.node_name_chn} ${s.node_name}`.includes(stationSearch.value)) || [])
@@ -171,8 +176,9 @@ function restoreSavedView(saved: SavedDiagramView) {
   viewport.value = { ...state.viewport }; from.value = state.from_time; to.value = state.to_time
   detailOpen.value = state.detail_open; restoredHeight.value = state.chart_height
   stationSearch.value = state.display?.station_search || ''; trainSearch.value = state.display?.train_search || ''; openPanels.value = [...(state.display?.open_panels || [])]
-  onlyHighlighted.value = state.display?.only_highlighted || false
   sourceDisplay.value = JSON.parse(JSON.stringify(state.display?.train_sources || {}))
+  // Convert the former live filter into a fixed selection using its saved highlights.
+  if (state.display?.only_highlighted) showHighlightedTrains()
   styleIssues.value = snapshot.data.issues.filter(issue => issue.code === 'style_config')
   viewStatus.value = `已打开保存视图：${saved.name}`
 }
@@ -192,7 +198,7 @@ function currentView(): CreateDiagramView | null {
       from_time: from.value, to_time: to.value, detail_open: detailOpen.value,
       chart_height: canvasRef.value?.getHeight() || restoredHeight.value || 600,
       display: { station_search: stationSearch.value, train_search: trainSearch.value, open_panels: openPanels.value,
-        only_highlighted: onlyHighlighted.value, train_sources: Object.fromEntries(trainSources.value.map(source => [source.key, { enabled: sourceEnabled(source), mode: sourceMode(source.key) }])) },
+        only_highlighted: false, train_sources: Object.fromEntries(trainSources.value.map(source => [source.key, { enabled: sourceEnabled(source), mode: sourceMode(source.key) }])) },
     },
     snapshot: { context: context.value, data: data.value },
   })) as CreateDiagramView
@@ -238,7 +244,7 @@ onUnmounted(() => { viewClosed = true; generation++; if (styleTimer) window.clea
   <template v-if="data"><div class="diagram-filters"><details class="diagram-station-filter" :open="openPanels.includes('stations')" @toggle="panel('stations', $event)"><summary>绘图车站（{{ stationIds.length }} / {{ data.axis.stations.length }}）</summary><input v-model="stationSearch" placeholder="筛选绘图车站" /><div class="diagram-station-actions"><button @click="stationIds = data.axis.stations.map(s => s.node_id)">全选车站</button><button @click="stationIds = []">清空车站</button></div><div class="checkbox-options"><label v-for="station in stationOptions" :key="station.node_id"><input v-model="stationIds" type="checkbox" :value="station.node_id" />{{ station.node_seq_of_line }} · {{ station.node_name_chn }}</label></div></details>
     <details class="diagram-train-filter" :open="openPanels.includes('trains')" @toggle="panel('trains', $event)"><summary>绘图列车（已选 {{ trainIds.length }} / {{ data.series.length }}，显示 {{ displayed.length }}）</summary>
       <div class="diagram-train-toolbar-wrap"><table class="diagram-train-toolbar" aria-label="绘图列车显示与选择"><tbody>
-        <tr><th><label class="diagram-train-toggle" title="只显示已启用来源中的高亮列车，保留原勾选车次"><input v-model="onlyHighlighted" type="checkbox" />只显示高亮列车</label></th>
+        <tr><th><button type="button" :disabled="busy || !selected.length" title="按当前高亮列车更新勾选名单，之后切换高亮不改变显示" @click="showHighlightedTrains">只显示高亮列车</button></th>
           <th v-for="source in trainSources" :key="source.key" :data-source="source.key" scope="col"><label class="diagram-train-toggle" :title="source.name"><input type="checkbox" :checked="sourceEnabled(source)" :disabled="busy || !source.available" :aria-label="`显示${source.label}`" @change="setSourceEnabled(source, ($event.target as HTMLInputElement).checked)" />{{ source.label }}</label>
             <div class="diagram-train-modes" role="radiogroup" :aria-label="`${source.label}显示范围`"><label><input type="radio" :name="`${controlId}-${source.key}`" value="all" :checked="sourceMode(source.key) === 'all'" :disabled="busy || !source.available" @change="setSourceMode(source, 'all')" />全部</label><label><input type="radio" :name="`${controlId}-${source.key}`" value="selected" :checked="sourceMode(source.key) === 'selected'" :disabled="busy || !source.available" @change="setSourceMode(source, 'selected')" />所选车次</label></div>
           </th><th class="diagram-train-search"><input v-model="trainSearch" aria-label="筛选绘图车次或方案" placeholder="筛选车次或方案" /></th></tr>

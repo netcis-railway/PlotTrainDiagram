@@ -131,6 +131,9 @@ a { color: var(--primary); }
 .tree-diagram { width: 17px; height: 17px; flex: 0 0 17px; fill: none; color: var(--primary); stroke: currentColor; stroke-width: 1.3; }
 .category-tree-row.active .tree-diagram { color: #fff; }
 .tree-document-letter { fill: currentColor; stroke: none; font: 700 9.5px Arial, sans-serif; }
+.tree-base .tree-document-letter, .tree-analysis-delay .tree-document-letter { font-family: "Arial Black", Arial, sans-serif; font-weight: 900; text-transform: uppercase; stroke: currentColor; stroke-width: .3; paint-order: stroke fill; }
+.tree-base .tree-document-letter { font-size: 13px; }
+.tree-timetable-grid { stroke-width: .9; }
 .tree-diagram.tree-analysis-delay { color: #cf443f; }
 .tree-diagram.tree-analysis-log { color: #22864a; }
 [data-theme="dark"] .tree-diagram.tree-analysis-delay { color: #ff9d94; }
