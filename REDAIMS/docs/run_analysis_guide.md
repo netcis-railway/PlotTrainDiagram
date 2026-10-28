@@ -53,6 +53,17 @@ UTF-8（含BOM）与GB18030/GBK可切换。编码不能严格解码时提示用�
 
 ## Linux 保存视图报 JSON 解析错误
 
+如果后端Traceback包含 `Required module 'pytz' failed to import` 和 `ModuleNotFoundError: No module named 'pytz'`，原因已经明确：运行后端的Python环境缺少pytz，DuckDB在将查询结果转换为Python时间对象时失败。本地Windows环境可能已通过其他依赖安装pytz，因此未暴露此问题。requirements.txt已显式声明该运行依赖。
+
+在Linux项目根目录中使用后端实际的虚拟环境安装：
+
+```bash
+.venv/bin/python -m pip install "pytz>=2024.1"
+.venv/bin/python -c "import sys, pytz, duckdb; print(sys.executable); print(pytz.__version__); print(duckdb.connect(':memory:').execute('SELECT current_timestamp').fetchone())"
+```
+
+确认安装成功且时间查询正常后，回到运行后端的tmux窗口，停止旧的uvicorn进程并按原启动命令重新启动，确保仍使用同一个 `.venv`。然后在网页重试保存。只在系统Python中安装、未给 `.venv` 安装，无法解决虚拟环境中的缺依赖问题。同步requirements.txt后也可通过 `.venv/bin/python -m pip install -r requirements.txt` 安装完整依赖。
+
 “JSON.parse: unexpected character at line 1 column 1”表示收到的响应不能解析为JSON；仅凭这条信息不能判定保存失败的根因。保存运行图会上传完整绘图快照及已读取的延误数据，可能超过代理的请求体大小限制。Windows开发模式直连与Linux经反向代理访问可能因此表现不同。
 
 前端现在会显示HTTP状态码、请求地址及响应类型，并保留后端原有JSON错误说明。HTML错误页、纯文本错误和意外空响应不会再掩盖成JSON解析异常，也不会作为保存成功处理或自动重试。

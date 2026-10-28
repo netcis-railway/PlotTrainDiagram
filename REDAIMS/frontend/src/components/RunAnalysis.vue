@@ -63,8 +63,8 @@ async function save() {
 </script>
 <template>
   <dialog ref="dialog" class="run-analysis-dialog" aria-labelledby="run-analysis-title" @cancel.prevent="close" @close="close">
-  <section class="run-analysis" aria-label="run分析工作区">
-    <div class="analysis-heading"><h2 id="run-analysis-title">run分析工作区<span v-if="runName"> · {{ runName }}</span></h2><div class="catalog-actions"><button type="button" @click="close">返回时刻表</button><button @click="openSave('view')">保存当前视图</button><button @click="openSave('solver-log')">保存求解日志展示</button><button @click="openSave('delay')">保存延误分析</button></div></div>
+  <section class="run-analysis" aria-label="运行图分析工作区">
+    <div class="analysis-heading"><h2 id="run-analysis-title">运行图分析工作区<span v-if="runName"> · run: {{ runName }}</span></h2><div class="catalog-actions"><button type="button" @click="close">返回时刻表</button><button @click="openSave('view')">保存当前视图</button><button @click="openSave('solver-log')">保存求解日志展示</button><button @click="openSave('delay')">保存延误分析</button></div></div>
     <p v-if="target?.node" class="category-context">{{ analysisLabels[target.node.node_type] }}：<strong>{{ target.node.name }}</strong> · {{ new Date(target.node.created_at).toLocaleString() }}</p>
     <p class="muted">三个小节可同时展开。保存节点会记录已读取小节的展示配置、展开状态和运行图/延误数据快照，供后续回看。</p>
     <form v-if="saveOpen" class="diagram-save-view" @submit.prevent="save"><label>子节点类型<select v-model="nodeType" :disabled="saving"><option v-for="(label, key) in analysisLabels" :key="key" :value="key">{{ label }}</option></select></label><label>名称<input v-model="name" required maxlength="200" :disabled="saving" /></label><button :disabled="saving || !name.trim()">{{ saving ? '正在保存…' : '保存' }}</button> <button type="button" :disabled="saving" @click="saveOpen = false">取消</button></form>
