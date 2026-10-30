@@ -38,7 +38,10 @@ async function remove() {
     <button type="button" :disabled="busy" @click="inspect">预览删除影响</button>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <form v-if="preview" @submit.prevent="remove">
-      <p v-if="!preview.can_delete" class="error">范围内有 {{ preview.physical_base_timetables.length }} 幅独立基本图、{{ preview.legacy_base_ids.length }} 幅旧基本图。请先移动/单独删除独立图，或明确迁移旧图；run 的去向选项不处理基本图。</p>
+      <p v-if="preview.physical_base_timetables.length || preview.legacy_base_ids.length" class="error">范围内有 {{ preview.physical_base_timetables.length }} 幅独立基本图、{{ preview.legacy_base_ids.length }} 幅旧基本图。请先移动/单独删除独立图，或明确迁移旧图；run 的去向选项不处理基本图。</p>
+      <p v-if="preview.owned_experiments?.length" class="error">范围内存放了实验实体，请先在实验管理中迁移存放类别或单独删除实验。</p>
+      <ul v-if="preview.owned_experiments?.length"><li v-for="experiment in preview.owned_experiments" :key="experiment.id">实验：{{ experiment.name }} · {{ path(experiment.owner_category_id) }}</li></ul>
+      <p v-if="preview.member_experiments?.length">涉及 {{ preview.member_experiments.length }} 条实验成员关系：永久删除run时移除其成员关系；保留或转移run时保留关系，并重新核对基本图和基准日。</p>
       <ul v-if="preview.physical_base_timetables.length"><li v-for="base in preview.physical_base_timetables" :key="base.id">基本图：{{ base.name }} · {{ path(base.owner_category_id) }}</li></ul>
       <p>将删除 {{ preview.node_count }} 个分类，涉及 {{ preview.run_count }} 个 run。分类删除不可撤销。</p>
       <details><summary>查看受影响分类和 run</summary><ul><li v-for="item in preview.nodes" :key="item.id">{{ path(item.id) }}</li><li v-for="run in preview.runs" :key="run.id">run：{{ run.name }} / {{ run.run_no }}</li></ul></details>

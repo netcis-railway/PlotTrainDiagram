@@ -338,3 +338,41 @@ table.diagram-train-toolbar { width: 100%; border-collapse: collapse; }
 .delay-chart path, .delay-chart circle { cursor: pointer; }
 [data-theme='dark'] .delay-positive { color: #ff9d8e; }
 [data-theme='dark'] .delay-negative { color: #8fcfff; }
+.experiment-manager { min-width: 0; }
+.experiment-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.experiment-manager fieldset { display: grid; gap: 16px; border: 0; padding: 0; min-width: 0; }
+.experiment-manager select { max-width: 100%; }
+.experiment-manager section { margin: 24px 0; }
+.experiment-table { overflow: auto; max-height: 420px; margin-bottom: 12px; }
+.experiment-table table { border-collapse: collapse; width: 100%; }
+.experiment-table td, .experiment-table th { text-align: left; padding: 9px; border: 1px solid var(--border); }
+.experiment-table th { position: sticky; top: 0; background: var(--surface); }
+.experiment-candidates { max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; margin: 12px 0; padding: 8px; }
+.experiment-candidates label { display: flex; align-items: start; gap: 8px; margin: 0; padding: 8px; border-bottom: 1px solid var(--border); }
+.experiment-candidates input[type='checkbox'], .experiment-table input[type='checkbox'] { width: auto; flex: 0 0 auto; }
+.experiment-candidates span { min-width: 0; overflow-wrap: anywhere; }
+.experiment-manager small { display: block; color: var(--muted); margin-top: 4px; }
+.experiment-manager .error { color: var(--danger); }
+.experiment-candidates .error { background: none; padding: 0; }
+.experiment-train-columns td { vertical-align: top; }
+.experiment-source-options { min-width: 210px; max-height: 320px; overflow-y: auto; }
+.experiment-source-options label { white-space: nowrap; }
+.analysis-run-picker { margin: 12px 0 18px; padding: 12px 16px; background: var(--soft); border-left: 4px solid var(--primary); border-radius: 5px; }
+.analysis-run-picker label { font-weight: 700; }
+.analysis-run-picker select { font-weight: 400; min-width: 0; max-width: 100%; }
+.analysis-run-picker p { margin: 10px 0 0; }
+.analysis-run-path { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.solver-progress-image { overflow: auto; max-height: 750px; border: 1px solid var(--border); margin-top: 14px; background: #fff; }
+.solver-progress-image img { display: block; max-width: none; min-width: 550px; height: auto; }
+.solver-progress-summary { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 7px 18px; }
+.solver-progress-summary dd { margin: 0; }
+.workbook-table-wrap { max-height: 65vh; overflow: auto; }
+.workbook-table { border-collapse: separate; border-spacing: 0; }
+.workbook-table th { white-space: nowrap; }
+.workbook-table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface, #f1f5f9); }
+.workbook-table tr > :first-child { position: sticky; left: 0; z-index: 1; background: var(--surface, #f1f5f9); }
+.workbook-table thead th:first-child { z-index: 3; }
+.workbook-table td { padding: 0; }
+.workbook-table input { min-width: 140px; width: 100%; border: 0; border-radius: 0; background: transparent; padding: 7px; }
+.workbook-cell-changed { box-shadow: inset 0 0 0 2px #d97706; }
+.editor-actions button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 1px; }

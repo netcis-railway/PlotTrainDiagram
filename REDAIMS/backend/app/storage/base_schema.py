@@ -56,6 +56,14 @@ TABLES = [
 
 def initialize(connection):
     independent = [
+        """CREATE TABLE IF NOT EXISTS run_workbooks (
+            run_id VARCHAR PRIMARY KEY, managed_name VARCHAR UNIQUE NOT NULL,
+            digest VARCHAR NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS base_tt_workbooks (
+            base_tt_id VARCHAR PRIMARY KEY, managed_name VARCHAR UNIQUE NOT NULL,
+            digest VARCHAR NOT NULL
+        )""",
         """CREATE TABLE IF NOT EXISTS base_timetables (
             id VARCHAR PRIMARY KEY, base_tt_no VARCHAR UNIQUE NOT NULL,
             owner_category_id VARCHAR UNIQUE NOT NULL, name VARCHAR NOT NULL,

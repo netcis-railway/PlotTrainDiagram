@@ -46,7 +46,7 @@ function toggle(id: string) {
 }
 function expandAll() { collapsed.value = new Set(); persist() }
 function collapseAll() { collapsed.value = new Set(props.nodes.filter(n => children.value.has(n.id)).map(n => n.id)); persist() }
-watch(() => props.selected, id => {
+watch([() => props.selected, () => props.nodes.find(n => n.id === props.selected)?.parent_id], ([id]) => {
   // Reveal selections made by the parent dropdown or by creating a new category.
   const next = new Set(collapsed.value)
   const visited = new Set<string>()
@@ -102,7 +102,12 @@ function keydown(event: KeyboardEvent, index: number) {
         <svg viewBox="0 0 16 16" aria-hidden="true" :class="{ expanded: !collapsed.has(row.node.id) }"><path d="m6 3 5 5-5 5" /></svg>
       </button><span v-else class="tree-chevron-placeholder" aria-hidden="true" />
       <svg v-if="row.node.kind === 'run' || row.node.baseReference || analysisLetter(row.node)" class="tree-diagram" :class="{ 'tree-base': !!row.node.baseReference, 'tree-analysis-view': analysisLetter(row.node) === 'V', 'tree-analysis-delay': analysisLetter(row.node) === 'D', 'tree-analysis-log': analysisLetter(row.node) === 'S' }" viewBox="0 0 20 18" aria-hidden="true">
-        <template v-if="row.node.baseReference">
+        <template v-if="row.node.experimentReference">
+          <rect x="3" y="1" width="14" height="16" />
+          <text class="tree-document-letter" x="10" y="13.5" text-anchor="middle">E</text>
+          <path v-if="row.node.experimentReference.virtual" d="M12 14h6m-2-2 2 2-2 2" />
+        </template>
+        <template v-else-if="row.node.baseReference">
           <rect x="3" y="1" width="14" height="16" />
           <text class="tree-document-letter" x="10" y="13.5" text-anchor="middle">B</text>
         </template>
@@ -120,7 +125,7 @@ function keydown(event: KeyboardEvent, index: number) {
         </template>
       </svg>
       <svg v-else class="tree-folder" viewBox="0 0 20 18" aria-hidden="true"><path v-if="row.expandable && !collapsed.has(row.node.id)" d="M2 6V3h6l2 2h7v2M2 7h17l-3 9H2Z" /><path v-else d="M2 3h6l2 2h8v11H2Z" /></svg>
-      <span class="tree-name">{{ row.node.name }}</span><small class="tree-kind">{{ row.node.logReference ? '求解日志' : row.node.analysisReference ? ({ view: '视图', 'solver-log': '求解日志', delay: '延误分析' })[row.node.analysisReference.nodeType] : row.node.viewReference ? '视图' : row.node.baseReference ? '基本图' : labels[row.node.kind] }}</small>
+      <span class="tree-name">{{ row.node.name }}</span><small class="tree-kind">{{ row.node.experimentReference ? (row.node.experimentReference.virtual ? '实验引用' : '实验实体') : row.node.logReference ? '求解日志' : row.node.analysisReference ? ({ view: '视图', 'solver-log': '求解日志', delay: '延误分析' })[row.node.analysisReference.nodeType] : row.node.viewReference ? '视图' : row.node.baseReference ? '基本图' : labels[row.node.kind] }}</small>
     </div>
   </div>
 </template>

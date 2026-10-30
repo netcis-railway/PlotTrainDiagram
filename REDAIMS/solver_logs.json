@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "solvers": [
+    {
+      "id": "gurobi",
+      "label": "Gurobi",
+      "case_sensitive": false,
+      "conditions": [
+        {
+          "start_line": 1,
+          "end_line": 50,
+          "match": "any",
+          "keywords": ["Gurobi Optimizer version", "Gurobi Optimizer", "Gurobi version"]
+        }
+      ],
+      "default_plotter": "gurobi_progress"
+    }
+  ],
+  "plotters": [
+    {
+      "id": "gurobi_progress",
+      "label": "Gurobi B&B 求解进度",
+      "solver_type": "gurobi",
+      "module": "gurobi.adapter",
+      "function": "render",
+      "source_file": "gurobi/plot_gurobi_progress.py",
+      "timeout_seconds": 45
+    }
+  ]
+}

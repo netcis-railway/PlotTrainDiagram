@@ -23,6 +23,7 @@ let screenSegments: { ax: number; ay: number; bx: number; by: number; hit: Hit }
 let drag: { x: number; y: number; originX: number; originY: number; moved: boolean } | null = null
 function queue() { if (!frame) frame = requestAnimationFrame(() => { frame = 0; draw() }) }
 function color(series: PlotSeries) {
+  if (series.color) return series.color
   const override = props.data.styles.train_styles[series.key]
   if (override?.color) return override.color
   if (series.object_type === 'base') return document.documentElement.dataset.theme === 'dark' ? props.data.styles.base_dark : props.data.styles.base

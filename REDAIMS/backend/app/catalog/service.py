@@ -151,7 +151,26 @@ class CatalogService:
         physical = connection.execute(
             "SELECT id,owner_category_id,name,revision FROM base_timetables ORDER BY id"
         ).fetchall()
-        snapshot = [[row for row in nodes if row[0] in affected], affected_runs, bindings, physical]
+        run_ids = {row[0] for row in affected_runs}
+        experiments = connection.execute(
+            "SELECT id,name,owner_category_id,revision FROM experiments ORDER BY id"
+        ).fetchall()
+        memberships = [
+            r
+            for r in connection.execute(
+                "SELECT experiment_id,run_id FROM experiment_members ORDER BY experiment_id,run_id"
+            ).fetchall()
+            if r[1] in run_ids
+        ]
+        impacted = {r[0] for r in memberships}
+        snapshot = [
+            [row for row in nodes if row[0] in affected],
+            affected_runs,
+            bindings,
+            physical,
+            [r for r in experiments if r[2] in affected or r[0] in impacted],
+            memberships,
+        ]
         token = hashlib.sha256(json.dumps(snapshot, ensure_ascii=False).encode()).hexdigest()
         return by_id, affected, affected_runs, token
 
@@ -172,10 +191,28 @@ class CatalogService:
                     "SELECT 1 FROM base_run_data WHERE run_id=? AND role='base'", [r[0]]
                 ).fetchone()
             ]
+            experiments = [
+                {"id": r[0], "name": r[1], "owner_category_id": r[2]}
+                for r in connection.execute(
+                    "SELECT id,name,owner_category_id FROM experiments ORDER BY id"
+                ).fetchall()
+                if r[2] in affected
+            ]
+            run_ids = {r[0] for r in runs}
+            member_experiments = [
+                {"id": r[0], "name": r[1], "run_id": r[2]}
+                for r in connection.execute(
+                    "SELECT e.id,e.name,m.run_id FROM experiments e "
+                    "JOIN experiment_members m ON m.experiment_id=e.id ORDER BY e.id,m.run_id"
+                ).fetchall()
+                if r[2] in run_ids
+            ]
         return {
+            "owned_experiments": experiments,
+            "member_experiments": member_experiments,
             "physical_base_timetables": physical,
             "legacy_base_ids": legacy,
-            "can_delete": not physical and not legacy,
+            "can_delete": not physical and not legacy and not experiments,
             "node_count": len(affected),
             "run_count": len(runs),
             "preview_token": token,
@@ -194,6 +231,13 @@ class CatalogService:
     def delete(self, node_id: str, payload: CatalogDelete):
         with self.database.transaction() as connection:
             by_id, affected, runs, token = self._impact(connection, node_id)
+            if any(
+                r[0] in affected
+                for r in connection.execute("SELECT owner_category_id FROM experiments").fetchall()
+            ):
+                raise ValueError(
+                    "范围内存在实验实体，请先迁移或单独删除实验；run去向不处理实验实体"
+                )
             physical = connection.execute(
                 "SELECT owner_category_id FROM base_timetables"
             ).fetchall()
@@ -260,8 +304,15 @@ class CatalogService:
                 connection.execute("DELETE FROM base_bindings WHERE scope_id=?", [scope])
             for row in runs:
                 if payload.action == "delete":
+                    connection.execute(
+                        "UPDATE experiments SET revision=revision+1 WHERE id IN "
+                        "(SELECT experiment_id FROM experiment_members WHERE run_id=?)",
+                        [row[0]],
+                    )
                     for (managed,) in connection.execute(
-                        "SELECT managed_name FROM source_files WHERE run_id=?", [row[0]]
+                        "SELECT managed_name FROM source_files WHERE run_id=? UNION ALL "
+                        "SELECT managed_name FROM run_workbooks WHERE run_id=?",
+                        [row[0], row[0]],
                     ).fetchall():
                         connection.execute(
                             "INSERT INTO file_cleanup VALUES (?,NULL) ON CONFLICT DO NOTHING",
@@ -275,9 +326,11 @@ class CatalogService:
                         "source_files",
                         "base_run_data",
                         "run_working_data",
+                        "run_workbooks",
                         "run_solver_logs",
                         "run_diagram_views",
                         "run_analysis_nodes",
+                        "experiment_members",
                     ):
                         connection.execute(f"DELETE FROM {table} WHERE run_id=?", [row[0]])
                     connection.execute("DELETE FROM base_bindings WHERE scope_id=?", [row[0]])

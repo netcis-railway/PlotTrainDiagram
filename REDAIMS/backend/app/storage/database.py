@@ -89,3 +89,23 @@ class Database:
             """)
 
             initialize(connection)
+            for column in (
+                "solver_type VARCHAR DEFAULT 'unknown'",
+                "default_plotter VARCHAR",
+                "detection JSON DEFAULT '{}'",
+            ):
+                connection.execute(f"ALTER TABLE run_solver_logs ADD COLUMN IF NOT EXISTS {column}")
+
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS experiments (
+                    id VARCHAR PRIMARY KEY, name VARCHAR UNIQUE NOT NULL,
+                    owner_category_id VARCHAR NOT NULL, notes VARCHAR NOT NULL DEFAULT '',
+                    revision BIGINT NOT NULL DEFAULT 1
+                )
+            """)
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS experiment_members (
+                    experiment_id VARCHAR NOT NULL, run_id VARCHAR NOT NULL,
+                    PRIMARY KEY (experiment_id, run_id)
+                )
+            """)

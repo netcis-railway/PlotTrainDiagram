@@ -402,6 +402,9 @@ class BaseImportService:
         }
 
     def _clear_run_data(self, connection, run_id):
+        from app.base_timetables.workbooks import discard_workbook
+
+        discard_workbook(connection, run_id, kind="run")
         # Queue old managed copies only within the transaction that replaces/deletes their data.
         for (managed,) in connection.execute(
             "SELECT managed_name FROM source_files WHERE run_id=?", [run_id]

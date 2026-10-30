@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from app.api.v1.diagram_views import router as diagram_view_router
+from app.api.v1.experiments import router as experiment_router
 from app.api.v1.run_analysis import router as run_analysis_router
 from app.api.v1.solver_logs import router as solver_log_router
 from app.api.v1.timetables import router as timetable_router
@@ -118,9 +119,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return catalog.ungrouped_runs()
 
     application.include_router(timetable_router(importer, settings))
-    application.include_router(solver_log_router(database))
+    application.include_router(solver_log_router(database, settings.solver_log_config))
     application.include_router(diagram_view_router(database))
     application.include_router(run_analysis_router(database))
+    application.include_router(experiment_router(database, importer))
     return application
 
 

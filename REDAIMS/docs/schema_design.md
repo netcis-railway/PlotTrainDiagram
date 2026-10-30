@@ -8,6 +8,8 @@
 | --- | --- |
 | base_timetables | id UUID 主键、base_tt_no 唯一、owner_category_id 非空且唯一、name、date_base、document JSON、revision；无伪 run |
 | base_tt_sources | id、base_tt_id、job_id、filename、digest、managed_name 唯一；独立来源归属 |
+| base_tt_workbooks | base_tt_id主键、managed_name唯一、digest；已保存工作数据的可更新Excel副本，原导入来源保留 |
+| run_workbooks | run_id主键、managed_name唯一、digest；run导出时更新并读回的完整受管Excel工作副本 |
 | base_tt_jobs | id、文件名/摘要、状态、options/report JSON、base_tt_id、error、created_at；与旧 import_jobs 分离 |
 | base_tt_migrations | old_run_id 主键、base_tt_id 唯一、snapshot JSON、created_at；保存旧记录、备份路径和身份映射 |
 | run_working_data | run_id 主键、date_base、revision；普通结果工作数据元信息 |
@@ -60,9 +62,13 @@ owner_category_id 有数据库唯一/非空约束，分类存在性及六级类�
 
 ## 基准日保存与选择性Excel导出
 
+2026-10-29补充：基本图普通时刻表保存和四表原始数据保存都会同步base_tt_workbooks。原base_tt_sources继续保留导入来源；工作副本另以workbook-UUID.xlsx命名，写入、flush/fsync完成后，在数据事务内更新副本引用和digest。失败回滚并删除新文件；旧副本在提交后通过file_cleanup清理。启动只扫描该前缀的无引用工作文件以恢复中断清理，覆盖导入或删除基本图同步移除其工作副本。详情返回可空working_file（managed_path、digest）。工作簿编辑接口和使用方法见[四表指南](base_workbook_guide.md)。
+
 EditRequest新增可选date_base，changes允许为空（此时必须有日期变化）。数据库仍以date_base加事件累计秒表示实际日期；保存同步更新BaseTT.date_base或run_working_data.date_base、列车基准日和修订。完整到发日期由读取接口派生，保留原source，不新增冗余绝对日期表列。校验token包含新日期。
 
-导出服务读取同一修订完整工作对象，返回xlsx字节，不修改数据库或受管来源。新导出由现有openpyxl依赖生成；覆盖时仅替换所选worksheet XML并追加所需日期样式，其他OOXML包内容逐字节保留，工作簿日期系统不变。浏览器先选择文件再请求生成，校验源文件指纹后创建写流，写入失败abort，close才提交。文件由用户浏览器授权写回，不开放任意服务端磁盘路径写接口。导出不是事务保存或归档。
+导出服务读取同一修订完整工作对象，先更新base_tt_workbooks或run_workbooks，再读回受管工作副本实际字节作为另存输出。保留原始导入来源；业务document、事件、基准日和内容修订不因导出改变，工作副本路径不参与tables业务修订。TTT按源行列更新数据，保留表名和布局；基础表优先保留有效源表头列序；其他worksheet及附属OOXML内容逐字节保留，缺失的所选基础表通过新增worksheet/关系/content-type补入，1900/1904日期系统不变。原字体、填充、边框和日期样式索引保持有效，新样式只追加去重。
+
+base副本以workbook-UUID.xlsx命名，run副本以workbook-run-UUID.xlsx命名；写入、flush/fsync及摘要校验成功后，在事务内更新引用，失败清理新文件并保留旧副本，覆盖导入和永久删除同步清理。启动恢复识别两种前缀并保留两张表引用的当前文件。用户选定外部目标进行同名表替换时，先准备同步副本，再合并用户指定表单，其他目标包内容保留；所有结果验证完成后才提交副本引用。浏览器文件写回失败由客户端abort，旧业务工作数据不会受影响。
 
 
 显示排序不增加数据库表或字段。读取tables时根据源xlsx及既有来源记录提供original_order、node_ind、line_inds；原始顺序读不到时明确回退。前端的排序模式与排序站点放在浏览器视图快照中，随独立编辑页/Dock交接。服务端事件、保存修订、SEQ和导出仍使用正式工作对象，不受当前视图排序影响。
@@ -119,6 +125,10 @@ SEQ修复只返回内存文件副本重新预检，不更新原任务/正式对�
 唯一键为 (run_id, filename, digest)。日志正文和元数据在同一数据库事务保存；普通 run 的存在性在同一事务检查。分类删除的 run 删除事务同步清理该表；移动和取消分组保留记录。旧版 role=base 不接受日志附件，不参与基本图迁移快照。时刻表修订号不包含日志附件。
 
 
+## 求解日志类型属性（2026-10-29）
+
+2026-10-29日志属性补充：run_solver_logs兼容增加solver_type VARCHAR DEFAULT 'unknown'、default_plotter VARCHAR及detection JSON DEFAULT '{}'。仅补充字段，不修改既有附件字节、digest、ID或分析引用；旧记录保持unknown，用户显式重新识别后写入属性。新上传按solver_logs.json识别并同事务保存属性；幂等重复上传保持现有类型设置。手动指定/重新识别仅更新属性，不修改时刻表修订。PNG在独立子进程临时目录生成，响应后清理，不新增图片业务表。
+
 ## run 保存的运行图视图（2026-10-27）
 
 新增run_diagram_views，由初始化CREATE TABLE IF NOT EXISTS兼容创建。
@@ -141,3 +151,17 @@ SEQ修复只返回内存文件副本重新预检，不更新原任务/正式对�
 state.version=1，记录三个小节的展开状态、运行图选择与快照、日志附件ID及展示配置、延误展示配置及结果快照。求解日志正文继续存run_solver_logs，节点引用本run附件；日志原文件不因文本编码选择而改变。run删除事务同步清理run_analysis_nodes，移动/取消分组保留。旧run_diagram_views不迁移或删除，前端兼容显示为视图子节点。analysisReference/logReference与旧viewReference均为前端虚拟叶节点，parent_id为所属run，不写入真实catalog_nodes。
 
 分析节点和日志不参与时刻表修订号。详情按run_id+node_id隔离，目录仅返回摘要。保存事务校验run及日志归属。运行图/延误快照与日后源数据修订分离。
+
+## Experiment 固定成员（2026-10-29）
+
+启动兼容创建experiments及experiment_members，不改已有时刻表或源文件。
+
+experiments字段：id VARCHAR PRIMARY KEY、name VARCHAR UNIQUE NOT NULL、owner_category_id VARCHAR NOT NULL、notes VARCHAR NOT NULL DEFAULT ''、revision BIGINT NOT NULL DEFAULT 1。owner_category_id引用六级分类中的实体存放位置，不决定成员范围，不参与run的基本图继承。名称全局唯一，同一类别可存放多个实验。
+
+experiment_members字段：experiment_id VARCHAR NOT NULL、run_id VARCHAR NOT NULL，联合主键(experiment_id,run_id)。关系引用普通run；不复制事件、来源、基本图或分析节点。整批加入在同一事务展开当前run并去重，仅持久化固定成员，不保存自动订阅。
+
+外键完整性由串行事务服务维护：创建/迁移检查现存类别；加入检查普通run、同一实际基本图和日期；删除实验先清成员；删除run同步清其关系并更新实验revision；有实验实体时阻止分类递归删除，须先迁移或删除实验。相关实验与成员纳入分类删除预览摘要。移动/未分组保留成员，读取时标记不兼容。
+
+实验列表/详情实时派生classification_path、成员effective_base、status/issues，不把当前基准锁成永久副本。修改/成员操作/删除要求revision匹配。实验管理不改变时刻表业务修订；时刻表已有全局上下文令牌仍可能因新增run或分类变化而失效。
+
+前端使用experimentReference：实体ID为experiment:{id}，parent为owner_category_id；run下的虚拟入口ID为experiment-ref:{runId}:{id}，parent为成员run。两者均不写入catalog_nodes，均打开同一Experiment实体；虚拟入口为叶节点。

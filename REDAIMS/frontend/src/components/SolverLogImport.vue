@@ -3,7 +3,7 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { request } from '../api/baseImport'
 const props = defineProps<{ runId: string; runName: string }>()
 const emit = defineEmits<{ close: []; imported: [filename: string] }>()
-interface SolverLog { id: string; filename: string; size_bytes: number; created_at: string }
+interface SolverLog { id: string; filename: string; size_bytes: number; created_at: string; solver_type?: string; default_plotter?: string | null }
 const dialog = ref<HTMLDialogElement | null>(null)
 const input = ref<HTMLInputElement | null>(null)
 const logs = ref<SolverLog[]>([]), file = ref<File | null>(null)
@@ -27,7 +27,7 @@ async function save() {
     logs.value = [saved, ...logs.value.filter(log => log.id !== saved.id)]
     file.value = null
     if (input.value) input.value.value = ''
-    status.value = '已保存求解日志：' + saved.filename
+    status.value = '已保存求解日志：' + saved.filename + ' · 求解器：' + (saved.solver_type && saved.solver_type !== 'unknown' ? saved.solver_type : '未识别')
     emit('imported', saved.filename)
   } catch (e) { if (!closed) error.value = String(e) }
   finally { if (!closed) busy.value = false }
@@ -51,7 +51,7 @@ onUnmounted(() => { closed = true; controller.abort(); previousFocus?.focus() })
       <div class="catalog-actions"><button type="submit" :disabled="busy || loading || !file">{{ busy ? '正在保存…' : '保存日志' }}</button><button type="button" @click="close">{{ status ? '关闭' : '取消' }}</button></div>
     </form>
     <h3>已导入日志</h3><p v-if="loading" role="status">正在读取…</p>
-    <ul v-else-if="logs.length" class="solver-log-list"><li v-for="log in logs" :key="log.id"><a :href="'/api/v1' + url + '/' + encodeURIComponent(log.id) + '/download'">{{ log.filename }}</a><small>{{ (log.size_bytes / 1024).toFixed(1) }} KB · {{ log.created_at.replace('T', ' ') }}</small></li></ul>
+    <ul v-else-if="logs.length" class="solver-log-list"><li v-for="log in logs" :key="log.id"><a :href="'/api/v1' + url + '/' + encodeURIComponent(log.id) + '/download'">{{ log.filename }}</a><small>求解器：{{ log.solver_type && log.solver_type !== 'unknown' ? log.solver_type : '未识别' }} · {{ (log.size_bytes / 1024).toFixed(1) }} KB · {{ log.created_at.replace('T', ' ') }}</small></li></ul>
     <p v-else class="muted">尚未导入求解日志。</p>
   </dialog>
 </template>

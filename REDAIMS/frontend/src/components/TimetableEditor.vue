@@ -15,7 +15,7 @@ import type { RepairIssue } from '../api/trackRepair'
 import { availableLines, stationsOnLine, orderStations, orderTrains, originalOrder, type StationSort, type TrainSort } from '../timetableOrdering'
 import { dockChannel, draftKey, editorHash, forgetTransfer, launchEditor, readTransfer, writeTransfer, type EditorSnapshot } from '../editorWindow'
 const props = defineProps<{ objectType: 'base' | 'run'; objectId: string; nodes: CatalogNode[]; standalone?: boolean; transfer?: string; actionRequest?: TimetableActionRequest }>()
-const emit = defineEmits<{ changed: [owner: string | null]; viewSaved: [view: DiagramViewSummary]; analysisSaved: [node: AnalysisNodeSummary]; logsChanged: [] }>()
+const emit = defineEmits<{ changed: [owner: string | null]; viewSaved: [view: DiagramViewSummary]; analysisSaved: [node: AnalysisNodeSummary]; logsChanged: []; draftChanged: [dirty: boolean] }>()
 const analysisSection = ref<AnalysisSection>('diagram')
 const editorRoot = ref<HTMLElement | null>(null)
 const data = ref<EditorData | null>(null), error = ref(''), status = ref(''), busy = ref(false)
@@ -36,6 +36,7 @@ const storageKey = computed(() => draftKey(props.objectType, props.objectId))
 const changeList = computed(() => Object.values(changes.value))
 const dateChanged = computed(() => !!data.value && dateBase.value !== (data.value.object.date_base || ''))
 const hasChanges = computed(() => changeList.value.length > 0 || dateChanged.value)
+watch(hasChanges, value => emit('draftChanged', value), { immediate: true })
 const lineOptions = computed(() => availableLines(data.value?.nodes || [], data.value?.display_lines))
 const lineStations = computed(() => stationsOnLine(data.value?.nodes || [], selectedLine.value))
 const orderedStations = computed(() => orderStations(lineStations.value, stationOrder.value, data.value?.original_order?.nodes, selectedLine.value))
@@ -309,13 +310,13 @@ watch(() => [props.objectType, props.objectId], load, { immediate: true })
       <button v-else :disabled="busy" @click="popout">在新标签页中编辑</button>
       <button :disabled="busy || docking || draftMismatch || !data.events.length" @click="shiftOpen = true">整车时间平移</button>
       <button :disabled="busy || docking || draftMismatch || !data.events.length" @click="repairOpen = true">修复股道信息</button>
-      <button :disabled="busy || docking || hasChanges || draftMismatch" @click="exportOpen = true">导出</button></div></div>
+      <button :disabled="busy || docking || hasChanges || draftMismatch" @click="exportOpen = true">{{ objectType === 'base' ? '导出基本图和线路数据' : '导出' }}</button></div></div>
     <div class="editor-date"><label>运行基准日<input v-model="dateBase" type="date" min="2020-01-01" max="9999-12-31" :disabled="busy || docking || !data.object.date_base" /></label>
       <p class="muted">修改基准日后，保存会更新全部到发日期和列车基准日，保留时分秒与跨日偏移。导出前请先保存修改。</p></div>
     <TimetableDiagram v-if="plotOpen && objectType === 'base'" :object-type="objectType" :object-id="objectId" :revision="data.revision" :date-base="dateBase" :original-date-base="data.object.date_base || ''" :changes="changeList" :initial-line="selectedLine" @view-saved="emit('viewSaved', $event)" @close="plotOpen = false" />
     <TimeShift v-if="shiftOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" :trains="data.trains" :initial-selected="trains" @close="shiftOpen = false" @applied="applyTimeShift" />
     <TrackRepair v-if="repairOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" @close="repairOpen = false" @applied="applyTrackRepair" />
-    <TimetableExport v-if="exportOpen" :url="url" :revision="data.revision" :object-type="objectType" @close="exportOpen = false" />
+    <TimetableExport v-if="exportOpen" :url="url" :revision="data.revision" :object-type="objectType" @backup-updated="emit('changed', data.object.owner_category_id)" @close="exportOpen = false" />
     <CategoryPicker v-if="picker" :nodes="nodes" :current="data.object.owner_category_id" :batch-only="objectType === 'run'" @close="picker = false" @choose="selectTarget" />
     <div v-if="movePreview" class="category-context"><h3>所属类别修改预览</h3><p>{{ formatPath(movePreview.source_path) }} → {{ formatPath(movePreview.target_path) }}</p>
       <p v-if="!movePreview.can_move" class="error">目标已占用、位置相同或存在校验问题，不能移动。</p><p v-for="(issue,i) in movePreview.issues" :key="i" class="error">{{ issue.message }}</p>

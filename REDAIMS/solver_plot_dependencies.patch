@@ -1,0 +1,12 @@
+diff --git a/REDAIMS/pyproject.toml b/REDAIMS/pyproject.toml
+--- a/REDAIMS/pyproject.toml
++++ b/REDAIMS/pyproject.toml
+@@ -10,6 +10,7 @@ requires-python = ">=3.11"
+ dependencies = [
+   "fastapi>=0.115,<1", "pydantic>=2,<3", "uvicorn>=0.30,<1",
+-  "PyYAML>=6,<7", "duckdb>=1.1,<3", "openpyxl>=3.1,<4",
++  "PyYAML>=6,<7", "duckdb>=1.1,<3", "pytz>=2024.1", "openpyxl>=3.1,<4",
++  "matplotlib>=3.8,<4",
+ ]
+ 
+ [project.optional-dependencies]

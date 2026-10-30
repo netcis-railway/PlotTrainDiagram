@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.base_timetables.ordering import editor_order, route_nodes
 from app.base_timetables.service import token
+from app.base_timetables.workbooks import book_bytes, materialize, working_copy_write
 from app.ingest.base_parser import event_time, integer
 from app.ingest.base_service import ImportConflict, ancestry, encode
 from app.ingest.sequences import sequence_problem
@@ -45,6 +46,7 @@ class EditorService:
         if kind == "base":
             row = self.base._row(c, object_id)
             meta = self.base._detail(c, row)
+            meta.pop("working_file", None)  # Exporting a backup does not revise timetable data.
             doc = json.loads(row[5])
             infrastructure = doc
         else:
@@ -343,7 +345,7 @@ class EditorService:
             return self._validate(c, kind, object_id, request)[0]
 
     def save(self, kind, object_id, request):
-        with self.database.transaction() as c:
+        with working_copy_write(self.base) as writer, self.database.transaction() as c:
             result, doc = self._validate(c, kind, object_id, request)
             if request.validation_token != result["validation_token"]:
                 raise ImportConflict("校验结果已过期，请对当前修改重新校验")
@@ -360,6 +362,14 @@ class EditorService:
                 raise ValueError("请确认运行基准日修改及全部到发日期更新")
             saved_day = request.date_base or self._load(c, kind, object_id)[0]["date_base"]
             if kind == "base":
+                if c.execute(
+                    "SELECT 1 FROM base_tt_sources WHERE base_tt_id=?", [object_id]
+                ).fetchone():
+                    book, _ = materialize(self.base, c, object_id, doc, saved_day)
+                    try:
+                        writer.save(c, object_id, book_bytes(book))
+                    finally:
+                        book.close()
                 c.execute(
                     "UPDATE base_timetables SET document=?,date_base=?,"
                     "revision=revision+1 WHERE id=?",

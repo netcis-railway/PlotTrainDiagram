@@ -1,6 +1,6 @@
 # API 契约：独立基本图与共用编辑
 
-更新：2026-10-25。以下为已接入的代码接口，前缀 `/api/v1`。生成快照见 [openapi.json](openapi.json)，运行服务以 `/openapi.json` 为准。当前本地登录不执行鉴权；后端仍仅面向本机开发使用。
+更新：2026-10-29。以下为已接入的代码接口，前缀 `/api/v1`。生成快照见 [openapi.json](openapi.json)，运行服务以 `/openapi.json` 为准。当前本地登录不执行鉴权；后端仍仅面向本机开发使用。
 
 ## 基本图与解析
 
@@ -29,6 +29,19 @@
 
 ## 共用编辑与普通 run
 
+### 基本图四表工作簿编辑
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | /base-timetables/{id}/workbook | sheet可选；offset、column_offset从0起，limit和column_limit为1–100、默认25行/40列；每页最多2000格。返回revision、工作表列表、当前列组的表头/列字母/单元格、源行号、total_rows、total_columns、column_offset、column_limit；单元格修改仍使用原Excel绝对行列号。快照取得后释放数据库锁再解析Excel |
+| POST | /base-timetables/{id}/workbook/validate | revision、changes；每项为sheet、row（Excel行号，至少2）、column（从1起）、value（文本或null）；校验完整四表并返回validation_token、issues、摘要、列车日期变化 |
+| POST | /base-timetables/{id}/workbook/save | 同上，加validation_token、warnings_confirmed、train_dates_confirmed；同步数据库和受管工作Excel，保留导入来源及基本图身份 |
+| GET | /base-timetables/{id}/workbook/export | revision必填；下载当前已保存工作簿，包含四表和原额外工作表 |
+
+单次最多修改50000个已有数据单元格，不接受重复坐标、表头、四表外工作表、越界或合并区域非首格。沿用32MB压缩、128MB解压限制，四表中的任一单表最多200万单元格。数据、分类或受管副本修订变化409；无效输入/校验失败422；文件写入失败503。保存失败回滚工作数据，成功后更新内容修订；数据库引用新文件后再清理旧工作副本，启动时清理中断遗留的无引用工作文件。浏览器不能指定任意服务器磁盘写入路径。
+
+### 时刻表编辑与run
+
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | GET | /runs、/runs/{id} | 普通结果列表/详情，排除未迁移旧基本图 |
@@ -55,9 +68,51 @@
 
 ## 错误与边界
 
+### Experiment 固定成员接口（2026-10-29）
+
+| 方法 | 路径 | 请求 / 用途 |
+| --- | --- | --- |
+| GET | /experiments | 列出实验、实体路径、成员及当前兼容状态 |
+| GET | /experiments/runs | 所有普通run候选，含完整路径、有效基本图、日期和不可用原因 |
+| POST | /experiments | name、owner_category_id、notes（可省略），创建空实验，201 |
+| GET | /experiments/{id} | 实验详情；status为empty/ready/invalid，member_mode固定为fixed |
+| PATCH | /experiments/{id} | revision及name/notes/owner_category_id中至少一个，改名或迁移实体 |
+| POST | /experiments/{id}/members | revision、run_ids、batch_ids；展开提交时的整批成员，原子加入并去重 |
+| DELETE | /experiments/{id}/members | revision、非空run_ids；只移除本实验成员关系 |
+| DELETE | /experiments/{id} | revision、confirmed=true；只删除实验和成员关系 |
+
+名称去首尾空白后1–200字符且全局唯一；备注最多20000字符。实体存放于六级现存类别，不接受run。修改字段不得为null；所有请求拒绝额外字段。整批加入后不跟踪后续新增run。POST members的run_ids最多2000个、batch_ids最多200个；DELETE members最多2000个run_ids。
+
+成功的创建、修改、成员加入/移除返回完整实验，含revision、classification_path、member_ids/member_count、members、status/issues及共同base_tt_id/date_base。成员包含run编号、完整实时分类路径、effective_base和unavailable_reason。列表和详情实时解析基准，不写入虚拟绑定。加入要求每个成员有有效基本图和已保存日期，且全部成员与基本图日期一致、实际base_tt_id唯一；不兼容409且整次回滚。旧修订/名称冲突409，不存在的实验404，非法类别/成员或请求422。
+
+类别删除预览新增owned_experiments和member_experiments。存在实体时can_delete=false；删除run事务清理成员关系并更新受影响实验修订，移动/取消分组保留关系。相关实体/成员变更纳入分类删除预览token。详见[实验管理指南](experiment_guide.md)。
+
+### Experiment 分析绘图（2026-10-29）
+
+- `GET /experiments/{experiment_id}/diagram/lines`：读取实时兼容成员与共同基本图，返回运行图context结构，新增members数组（id/name/run_no/color/classification_path等）。object表示实验及其实体存放路径，revision覆盖实验与全部成员输入。
+- `POST /experiments/{experiment_id}/diagram/data`：请求revision、line_ind、overlay_base（默认true）、expanded_stations（默认空，最多500）；拒绝额外字段，不接受调用方任意指定run或草稿。返回共用轴、全部成员运行线、单份基本图、股道资源、诊断与members。run系列新增color；系列key保留真实run身份。
+
+空/不可比实验409，不存在404；旧输入修订409，非法线路参数或非本线路展开车站422。一次绘图在同一数据库事务读取全部成员，沿用既有站轴、运行线和股道几何规则，不写业务数据；诊断日志沿用绘图日志。成员按(run_no,id)排序，前三色分别#d32f2f/#1565c0/#006400。求解日志和延误分析继续按所选成员调用既有run接口。
+
+### 求解日志类型和可视化（2026-10-29）
+
+原日志上传/列表/文本接口路径不变。上传自动识别；per-run日志响应增加solver_type（默认unknown）、default_plotter（可null）、detection（识别模式/编码/配置摘要/命中行和关键词）。文本接口同样返回这些属性；全局analysis/logs仍保持轻量id/run_id/filename摘要兼容。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | /solver-logs/config | 当前求解器和作图函数注册表，含可用状态及配置修订 |
+| POST | /runs/{run_id}/solver-logs/{log_id}/classify | solver_type默认auto；可指定已登记类型或unknown，只更新类型/默认函数/依据 |
+| POST | /runs/{run_id}/solver-logs/{log_id}/visualization | encoding（utf-8/gb18030）、可选plotter_id、可选options，生成真实PNG |
+
+可视化返回plotter_id、label、solver_type、mime_type=image/png、image_base64、image_name及summary。编码与函数类型不匹配、无可用进度、超时等422；配置/脚本/依赖/执行环境错误503；run和日志归属不匹配404。调用方不能指定Python路径、模块或函数，只能选择对应类型已登记的plotter_id。options限制20000字符；PNG最多16MB，子进程超时配置为1–60秒。原日志下载字节不变，不持久化临时PNG。
+
+识别/配置见[求解日志指南](solver_logs_guide.md)；默认Python脚本契约见[扩展说明](../backend/app/solver_visualizers/README.md)。
+
+### 通用响应
+
 404：对象/来源不存在；409：预览、上下文或校验凭证过期、业务冲突；422：参数/数据/确认不合法；413：上传过大；503：文件操作失败。预检的可定位数据错误通常在 201 响应 report.issues 中，而不是整体请求失败。
 
-JSON 配置导入导出、归档、历史工作区、experiment、多文件/片段合并及特定 SEQ 强制提交接口尚未提供。当前 OpenAPI 已列出路径和请求模型，部分字典响应尚未细化为响应模型；集成需以此契约和返回字段为准。
+JSON 配置导入导出、归档、历史工作区、多文件/片段合并及特定 SEQ 强制提交接口尚未提供。Experiment固定成员管理已提供，见下文；自动跟踪和提醒加入尚未提供。当前 OpenAPI 已列出路径和请求模型，部分字典响应尚未细化为响应模型；集成需以此契约和返回字段为准。
 
 独立编辑为前端 hash 地址 `#timetable?kind=base|run&id=<ID>&transfer=<交接标识>`；Dock 目标为 `#workspace?...`，刷新仍使用同一静态入口，无需新增服务端路由。以上显示控制与标签页交接不改变 API 契约或服务端保存目标。
 
@@ -68,10 +123,12 @@ JSON 配置导入导出、归档、历史工作区、experiment、多文件/片�
 
 | 方法 | 路径 | 请求/结果 |
 | --- | --- | --- |
-| GET | /base-timetables/{id}/export-options、/runs/{id}/export-options | 返回revision、sheets(key/name/label/rows)、defaults、建议filename；基本图默认四表，run默认TTT |
+| GET | /base-timetables/{id}/export-options、/runs/{id}/export-options | 返回revision、sheets(key/name/label/rows)、defaults、建议filename；默认勾选当前可用四表，run缺少有效基本图时仅TTT |
 | POST | /base-timetables/{id}/export、/runs/{id}/export | query:revision、sheets（逻辑key逗号分隔）、replace（默认false）；返回xlsx字节及UTF-8 Content-Disposition |
 
-另存请求体为空；replace=true时请求体为用户选定源xlsx二进制，上限32MB、解压上限128MB。选中表单必须在原文件存在同名sheet，否则422；支持TTT、LINE_INFO、NODE_INFO、MINIMUM_RUN_TIME。未选sheet及其他包内容保留，1904日期系统受测试覆盖。修订变化409；没有正式数据、无效选择、缺失索引或非无损宽表情形422。接口不接受任意磁盘路径、不在服务器覆盖文件，实际写回/另存由浏览器文件选择与写入API负责，缺少该能力时明确下载并由用户手动替换。参考 [Chrome本地文件API](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)。
+导出先更新受管副本并校验文件摘要，再返回副本实际字节；sheets表示从数据库更新的范围，未选表单及其他线路数据表保留在完整副本中。原文件缺少所选基础表时补入。副本元信息更新不修改时刻表业务修订；业务数据、基准日、归属变化仍返回409。
+
+另存请求体为空；replace=true时请求体为用户选定源xlsx二进制，上限32MB、解压上限128MB。后者在更新受管副本后，输出将所选同名表合并到用户目标文件的结果，目标必须存在同名sheet，否则422；支持TTT、LINE_INFO、NODE_INFO、MINIMUM_RUN_TIME。目标未选sheet及其他包内容保留，1904日期系统受测试覆盖。没有正式数据、无效选择、缺失来源或不支持的宽表情形422，文件操作失败503且保留旧副本。接口不接受任意磁盘路径；外部目标的实际写回/另存由浏览器文件选择与写入API负责，缺少该能力时明确下载并由用户手动替换。参考 [Chrome本地文件API](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)。
 
 
 ## 显示顺序元数据（2026-10-25）

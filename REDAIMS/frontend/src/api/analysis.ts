@@ -4,7 +4,10 @@ export type AnalysisSection = 'diagram' | 'log' | 'delay'
 export type AnalysisNodeType = 'view' | 'solver-log' | 'delay'
 export const analysisLabels: Record<AnalysisNodeType, string> = { view: '视图', 'solver-log': '求解日志', delay: '延误分析' }
 export interface AnalysisSource { revision: string; dateBase: string; originalDateBase: string; changes: Change[]; initialLine: string }
-export interface SolverLogSummary { id: string; run_id: string; filename: string }
+export interface SolverLogSummary { id: string; run_id: string; filename: string; solver_type?: string; default_plotter?: string | null; detection?: { encoding?: 'utf-8' | 'gb18030' | null; mode?: string; reason?: string } }
+export interface SolverPlotter { id: string; label: string; solver_type: string; source_file: string; available: boolean }
+export interface SolverLogConfig { solvers: { id: string; label: string; default_plotter: string | null }[]; plotters: SolverPlotter[]; revision: string }
+export interface SolverPlot { plotter_id: string; label: string; mime_type: 'image/png'; image_base64: string; image_name: string; solver_type: string; summary: Record<string, number | null> }
 export interface LogDisplay { log_id: string; encoding: 'utf-8' | 'gb18030'; search: string; wrap: boolean; scroll_top: number; scroll_left: number; visualization_state: Record<string, unknown> }
 export interface DelaySnapshot {
   version: 1; object: EditorData['object']; base: EditorData['object']; revision: string; unit: 'seconds'
@@ -29,11 +32,14 @@ export interface SavedAnalysisNode extends AnalysisNodeSummary { state: Analysis
 export interface AnalysisTarget { node?: SavedAnalysisNode; diagram?: SavedDiagramView; logId?: string }
 export const defaultLogDisplay = (): LogDisplay => ({ log_id: '', encoding: 'utf-8', search: '', wrap: true, scroll_top: 0, scroll_left: 0, visualization_state: {} })
 export const analysisApi = {
+  logConfig: () => request<SolverLogConfig>('/solver-logs/config'),
+  classifyLog: (run: string, id: string, solverType = 'auto') => post<SolverLogSummary>(`/runs/${encodeURIComponent(run)}/solver-logs/${encodeURIComponent(id)}/classify`, { solver_type: solverType }),
+  plotLog: (run: string, id: string, encoding: LogDisplay['encoding'], plotterId: string) => post<SolverPlot>(`/runs/${encodeURIComponent(run)}/solver-logs/${encodeURIComponent(id)}/visualization`, { encoding, plotter_id: plotterId }),
   nodes: () => request<AnalysisNodeSummary[]>('/analysis/nodes'),
   logs: () => request<SolverLogSummary[]>('/analysis/logs'),
   node: (run: string, id: string) => request<SavedAnalysisNode>(`/runs/${encodeURIComponent(run)}/analysis-nodes/${encodeURIComponent(id)}`),
   save: (run: string, body: { name: string; node_type: AnalysisNodeType; state: AnalysisState }) => post<AnalysisNodeSummary>(`/runs/${encodeURIComponent(run)}/analysis-nodes`, body),
   runLogs: (run: string) => request<SolverLogSummary[]>(`/runs/${encodeURIComponent(run)}/solver-logs`),
-  logText: (run: string, id: string, encoding: LogDisplay['encoding']) => request<{ text: string; filename: string; digest: string }>(`/runs/${encodeURIComponent(run)}/solver-logs/${encodeURIComponent(id)}/text?encoding=${encoding}`),
+  logText: (run: string, id: string, encoding: LogDisplay['encoding']) => request<{ text: string; filename: string; digest: string; solver_type?: string; default_plotter?: string | null; detection?: SolverLogSummary['detection'] }>(`/runs/${encodeURIComponent(run)}/solver-logs/${encodeURIComponent(id)}/text?encoding=${encoding}`),
   delays: (run: string) => request<DelaySnapshot>(`/runs/${encodeURIComponent(run)}/delay-analysis`),
 }

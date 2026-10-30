@@ -1,12 +1,13 @@
 import type { CatalogTreeNode } from './types/catalogTree'
 
-export type CatalogActionId = 'import-base' | 'base-diagram' | 'import-run' | 'edit-base' | 'delete-base' | 'edit-run' | 'run-diagram' | 'import-log' | 'open-view' | 'open-analysis' | 'open-log' | 'delay-analysis'
+export type CatalogActionId = 'open-experiment' | 'import-base' | 'base-diagram' | 'import-run' | 'edit-base' | 'delete-base' | 'edit-run' | 'run-diagram' | 'import-log' | 'open-view' | 'open-analysis' | 'open-log' | 'delay-analysis'
 export interface CatalogAction { id: CatalogActionId; label: string; disabled?: boolean; title?: string; danger?: boolean }
 export interface TimetableActionRequest { sequence: number; kind: 'base' | 'run'; objectId: string; action: 'edit' | 'diagram' | 'delete' | 'delay' }
 
 // Both entry points use this list, including the same availability rules.
 export function catalogActions(node: CatalogTreeNode | undefined, hasBase: boolean): CatalogAction[] {
   if (!node) return []
+  if (node.experimentReference) return [{ id: 'open-experiment', label: '管理实验' }]
   if (node.analysisReference) return [{ id: 'open-analysis', label: '查看保存分析' }]
   if (node.logReference) return [{ id: 'open-log', label: '查看求解日志' }]
   if (node.viewReference) return [{ id: 'open-view', label: '查看保存视图' }]

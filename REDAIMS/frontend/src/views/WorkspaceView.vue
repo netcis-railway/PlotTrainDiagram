@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import RunAnalysis from '../components/RunAnalysis.vue'
+import ExperimentManager from '../components/ExperimentManager.vue'
+import { experimentApi, type Experiment } from '../api/experiments'
 import { analysisApi, analysisLabels, type AnalysisNodeSummary, type SavedAnalysisNode, type SolverLogSummary } from '../api/analysis'
 import { diagramApi, type DiagramViewSummary, type SavedDiagramView } from '../api/diagram'
 import CatalogContextMenu from '../components/CatalogContextMenu.vue'
@@ -9,7 +11,7 @@ import { catalogActions, type CatalogActionId, type TimetableActionRequest } fro
 import ImportPreview from '../components/ImportPreview.vue'
 import CatalogSplitter from '../components/CatalogSplitter.vue'
 import BaseDiagramInfo from '../components/BaseDiagramInfo.vue'
-import { baseReferenceId, viewReferenceId, analysisReferenceId, logReferenceId, type CatalogTreeNode } from '../types/catalogTree'
+import { baseReferenceId, viewReferenceId, analysisReferenceId, logReferenceId, experimentEntityId, experimentTreeNodes, type CatalogTreeNode } from '../types/catalogTree'
 import CategoryTree from '../components/CategoryTree.vue'
 import BaseImport from '../components/BaseImport.vue'
 import LegacyBaseMigration from '../components/LegacyBaseMigration.vue'
@@ -28,6 +30,7 @@ const resolution = ref<Resolution | null>(null)
 const tabs = [
   { id: 'view', title: '查看编辑' }, { id: 'new', title: '新建' },
   { id: 'delete', title: '删除' }, { id: 'base', title: '基本图' },
+  { id: 'experiments', title: 'Experiment 实验' },
 ] as const
 type Tab = typeof tabs[number]['id']
 const activeTab = ref<Tab>('view')
@@ -45,18 +48,45 @@ function tabKeydown(event: KeyboardEvent, index: number) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
-  closeContextMenu(); actionRequest.value = undefined; activeTab.value = tabs[next]!.id
+  switchTab(tabs[next]!.id)
   const target = event.currentTarget as HTMLElement
   target.parentElement?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
 }
 
 type CreationKind = Kind | 'run'
+function switchTab(tab: Tab) {
+  closeContextMenu(); actionRequest.value = undefined
+  if (tab !== 'experiments') { selectedExperimentId.value = ''; experimentSelection.value = '' }
+  activeTab.value = tab
+}
+function selectExperiment(id: string) {
+  if (!id) { selectedExperimentId.value = ''; experimentSelection.value = ''; activeTab.value = 'experiments'; return }
+  const entry = treeNodes.value.find(n => n.id === experimentEntityId(id))
+  if (entry) select(entry)
+}
+function afterExperimentChanged(value: Experiment | null, sourceId: string, reveal: boolean) {
+  experimentListVersion++
+  experiments.value = experiments.value.filter(e => e.id !== (value?.id || sourceId))
+  if (value) experiments.value.push(value)
+  if (reveal) selectExperiment(value?.id || '')
+}
+function replaceExperiments(items: Experiment[]) {
+  experiments.value = items
+  if (selectedExperimentId.value && !items.some(e => e.id === selectedExperimentId.value)) { selectedExperimentId.value = ''; experimentSelection.value = '' }
+  if (experimentSelection.value && !treeNodes.value.some(n => n.id === experimentSelection.value)) experimentSelection.value = selectedExperimentId.value ? experimentEntityId(selectedExperimentId.value) : ''
+}
+function openExperimentRun(id: string) {
+  const entry = treeNodes.value.find(n => n.id === id)
+  if (entry) select(entry)
+}
 const labels: Record<CreationKind, string> = { user: '研究员', network: '路网', scenario: '场景', case: '案例', algorithm: '算法', batch: '批次', run: 'run' }
 const parents: Record<CreationKind, Kind | null> = { user: null, network: 'user', scenario: 'network', case: 'scenario', algorithm: 'case', batch: 'algorithm', run: 'batch' }
 const nodes = ref<CatalogNode[]>([])
 const ungrouped = ref<UngroupedRun[]>([])
 const selected = ref('')
 const selectedBaseId = ref('')
+const experiments = ref<Experiment[]>([]), selectedExperimentId = ref(''), experimentSelection = ref('')
+let experimentListVersion = 0
 const savedViews = ref<DiagramViewSummary[]>([]), selectedViewId = ref(''), openedView = ref<SavedDiagramView | null>(null), viewLoading = ref(false)
 const analysisNodes = ref<AnalysisNodeSummary[]>([]), solverLogs = ref<SolverLogSummary[]>([])
 const selectedAnalysisId = ref(''), selectedLogId = ref(''), openedAnalysis = ref<SavedAnalysisNode | null>(null), openedLogId = ref('')
@@ -100,9 +130,10 @@ const treeNodes = computed<CatalogTreeNode[]>(() => {
     logReference: { runId: log.run_id, logId: log.id },
   }))
   const ungroupedItems: CatalogTreeNode[] = ungrouped.value.map(run => ({ id: run.id, kind: 'run', parent_id: null, name: `未分组run：${run.name}`, notes: '' }))
-  return [...items, ...nodes.value, ...ungroupedItems, ...viewItems, ...logItems, ...analysisItems]
+  return [...items, ...nodes.value, ...ungroupedItems, ...viewItems, ...logItems, ...analysisItems,
+    ...experimentTreeNodes(experiments.value, new Set([...nodes.value.filter(n => n.kind === 'run').map(n => n.id), ...ungrouped.value.map(r => r.id)]))]
 })
-const selectedTreeId = computed(() => selectedBaseId.value ? baseReferenceId(selected.value, selectedBaseId.value) : selectedViewId.value ? viewReferenceId(selected.value, selectedViewId.value) : selectedAnalysisId.value ? analysisReferenceId(selected.value, selectedAnalysisId.value) : selectedLogId.value ? logReferenceId(selected.value, selectedLogId.value) : selected.value)
+const selectedTreeId = computed(() => experimentSelection.value || (selectedBaseId.value ? baseReferenceId(selected.value, selectedBaseId.value) : selectedViewId.value ? viewReferenceId(selected.value, selectedViewId.value) : selectedAnalysisId.value ? analysisReferenceId(selected.value, selectedAnalysisId.value) : selectedLogId.value ? logReferenceId(selected.value, selectedLogId.value) : selected.value))
 const selectedEntry = computed(() => treeNodes.value.find(node => node.id === selectedTreeId.value) || current.value)
 const actions = computed(() => catalogActions(selectedEntry.value, !!currentBaseId.value).map(action => ({ ...action, disabled: !!action.disabled || busy.value })))
 function closeContextMenu() { contextMenu.value = null }
@@ -116,6 +147,7 @@ function performAction(id: CatalogActionId) {
   const action = actions.value.find(item => item.id === id)
   if (!action || action.disabled || busy.value || !current.value) return
   closeContextMenu()
+  if (id === 'open-experiment') { activeTab.value = 'experiments'; return }
   if (id === 'open-analysis' && selectedAnalysis.value) { void openAnalysisNode(selectedAnalysis.value); return }
   if (id === 'open-log' && selectedLog.value) { openedLogId.value = selectedLog.value.id; return }
   if (id === 'open-view' && selectedDiagramView.value) { void openSavedView(selectedDiagramView.value); return }
@@ -132,6 +164,11 @@ watch(() => props.view, closeContextMenu)
 watch(selectedTreeId, closeContextMenu, { flush: 'sync' })
 function treePath(id: string): string {
   const entry = treeNodes.value.find(node => node.id === id)
+  if (entry?.experimentReference) {
+    const reference = entry.experimentReference
+    const experiment = experiments.value.find(e => e.id === reference.experimentId)
+    return `${categoryPath(entry.parent_id!)} → 实验：${experiment?.name || ''}${reference.virtual ? `（引用，实体存放：${categoryPath(reference.ownerId)}）` : ''}`
+  }
   if (entry?.analysisReference || entry?.logReference) return `${categoryPath(entry.parent_id!)} → ${entry.name}`
   const view = entry?.viewReference
   if (view) return `${categoryPath(view.runId)} → 视图：${savedViews.value.find(item => item.id === view.viewId)?.name || ''}`
@@ -185,14 +222,16 @@ async function refreshResolution() {
 watch(selected, refreshResolution, { flush: 'sync' })
 async function refresh() {
   const viewsVersion = ++viewListVersion
+  const experimentsVersion = ++experimentListVersion
   try {
-    const [, catalog, ordinaryRuns, baseItems, ungroupedRuns, viewItems, analysisItems, logItems] = await Promise.all([
-      api.health(), api.catalog(), baseApi.runs(), baseApi.bases(), deletionApi.ungrouped(), diagramApi.views(), analysisApi.nodes(), analysisApi.logs(),
+    const [, catalog, ordinaryRuns, baseItems, ungroupedRuns, viewItems, analysisItems, logItems, experimentItems] = await Promise.all([
+      api.health(), api.catalog(), baseApi.runs(), baseApi.bases(), deletionApi.ungrouped(), diagramApi.views(), analysisApi.nodes(), analysisApi.logs(), experimentApi.list(),
     ])
     nodes.value = [...catalog, ...ordinaryRuns.filter(r => r.batch_id).map(r => ({
       id: r.id, parent_id: r.batch_id, name: `${r.name} / run_${r.run_no}`, kind: 'run' as const, notes: '',
     }))]
     bases.value = baseItems; ungrouped.value = ungroupedRuns
+    if (experimentsVersion === experimentListVersion) replaceExperiments(experimentItems)
     if (viewsVersion === viewListVersion) { savedViews.value = viewItems; analysisNodes.value = analysisItems; solverLogs.value = logItems }
     if ((selectedViewId.value && !savedViews.value.some(view => view.id === selectedViewId.value)) || (selectedAnalysisId.value && !analysisNodes.value.some(node => node.id === selectedAnalysisId.value)) || (selectedLogId.value && !solverLogs.value.some(log => log.id === selectedLogId.value))) {
       viewGeneration++; selectedViewId.value = ''; selectedAnalysisId.value = ''; selectedLogId.value = ''; openedAnalysis.value = null; openedView.value = null; openedLogId.value = ''; viewLoading.value = false
@@ -205,7 +244,8 @@ async function refresh() {
 }
 async function refreshSavedViews() {
   const version = ++viewListVersion
-  try { const [result, analyses, logs] = await Promise.all([diagramApi.views(), analysisApi.nodes(), analysisApi.logs()]); if (version === viewListVersion) { savedViews.value = result; analysisNodes.value = analyses; solverLogs.value = logs } }
+  const experimentsVersion = ++experimentListVersion
+  try { const [result, analyses, logs, experimentItems] = await Promise.all([diagramApi.views(), analysisApi.nodes(), analysisApi.logs(), experimentApi.list()]); if (version === viewListVersion) { savedViews.value = result; analysisNodes.value = analyses; solverLogs.value = logs }; if (experimentsVersion === experimentListVersion) replaceExperiments(experimentItems) }
   catch { /* The explicit workspace refresh reports connection failures. */ }
 }
 function afterViewSaved(view: DiagramViewSummary) {
@@ -265,6 +305,7 @@ async function createNode() {
   } catch (e) { error.value = String(e) } finally { busy.value = false }
 }
 function setCurrent(node: CatalogNode) {
+  selectedExperimentId.value = ''; experimentSelection.value = ''
   viewGeneration++; viewLoading.value = false; openedView.value = null; selectedViewId.value = ''
   selectedAnalysisId.value = ''; selectedLogId.value = ''; openedAnalysis.value = null; openedLogId.value = ''
   actionRequest.value = undefined; selectedBaseId.value = ''; selected.value = node.id
@@ -272,6 +313,13 @@ function setCurrent(node: CatalogNode) {
 }
 function select(entry: CatalogTreeNode, openView = true) {
   closeContextMenu()
+  if (entry.experimentReference) {
+    const reference = entry.experimentReference
+    const parent = treeNodes.value.find(n => n.id === entry.parent_id)
+    if (!parent) return
+    select(parent, false); selectedExperimentId.value = reference.experimentId; experimentSelection.value = entry.id
+    activeTab.value = 'experiments'; return
+  }
   const node = entry.analysisReference || entry.logReference ? treeNodes.value.find(item => item.id === entry.parent_id) : entry.viewReference ? treeNodes.value.find(item => item.id === entry.viewReference!.runId) : entry.baseReference ? nodes.value.find(n => n.id === entry.baseReference!.scopeId) : entry
   if (!node) return
   setCurrent(node)
@@ -305,7 +353,7 @@ function changeKind() {
   if (ancestor) setCurrent(ancestor)
 }
 async function saveCategory() {
-  if (busy.value || !current.value || current.value.kind === 'run' || selectedBaseId.value || isAnalysisChild.value) return
+  if (busy.value || !current.value || current.value.kind === 'run' || selectedBaseId.value || isAnalysisChild.value || experimentSelection.value) return
   const newName = draftName.value.trim()
   if (!newName) { error.value = '类别名称不能为空'; return }
   busy.value = true; error.value = ''
@@ -355,6 +403,7 @@ onUnmounted(() => { viewGeneration++; viewListVersion++; window.removeEventListe
   <main class="workspace" :class="{ 'import-workspace': view !== 'catalog' }" :style="{ '--catalog-width': `${sidebarWidth}px` }">
     <aside v-show="view === 'catalog'" id="catalog-navigation" class="category-sidebar">
       <div class="category-sidebar-heading"><h2>项目分类</h2><button @click="refresh" :disabled="busy">刷新</button></div>
+      <button type="button" @click="selectExperiment('')">新建 Experiment 实验</button>
       <p v-if="!nodes.length">尚无分类，请点击“新建”创建研究员。</p>
       <CategoryTree :nodes="treeNodes" :selected="selectedTreeId" :labels="labels" :path="treePath" context-menu @select="select" @contextmenu="openContextMenu" />
     </aside>
@@ -365,7 +414,7 @@ onUnmounted(() => { viewGeneration++; viewListVersion++; window.removeEventListe
         <div class="catalog-tabs" role="tablist" aria-label="分类管理操作">
           <button v-for="(tab, index) in tabs" :id="`catalog-tab-${tab.id}`" :key="tab.id" type="button" role="tab"
             :aria-selected="activeTab === tab.id" :aria-controls="`catalog-panel-${tab.id}`" :tabindex="activeTab === tab.id ? 0 : -1"
-            :class="{ active: activeTab === tab.id }" @click="closeContextMenu(); actionRequest = undefined; activeTab = tab.id" @keydown="tabKeydown($event, index)">{{ tab.title }}</button>
+            :class="{ active: activeTab === tab.id }" @click="switchTab(tab.id)" @keydown="tabKeydown($event, index)">{{ tab.title }}</button>
         </div>
         <article v-if="activeTab === 'view'" id="catalog-panel-view" role="tabpanel" aria-labelledby="catalog-tab-view" tabindex="0">
           <template v-if="current">
@@ -419,6 +468,9 @@ onUnmounted(() => { viewGeneration++; viewListVersion++; window.removeEventListe
           <div v-if="current" class="catalog-actions" role="group" aria-label="所选条目操作"><strong>操作</strong><button v-for="action in actions" :key="action.id" type="button" :disabled="busy || action.disabled" :title="action.title" :class="{ danger: action.danger }" @click="performAction(action.id)">{{ action.label }}</button></div>
           <BaseDiagramInfo v-if="current" :key="currentBaseId + editorKey" :base-id="currentBaseId" :scope-path="currentPath" :resolution="resolution" :nodes="nodes" :action-request="actionRequest" @changed="afterDataChanged" />
           <template v-else><h2>基本图</h2><p class="empty-state">请从左侧选择分类或基本图条目。</p></template>
+        </article>
+        <article v-if="activeTab === 'experiments'" id="catalog-panel-experiments" role="tabpanel" aria-labelledby="catalog-tab-experiments" tabindex="0">
+          <ExperimentManager :nodes="nodes" :experiments="experiments" :experiment-id="selectedExperimentId" :initial-owner-id="current?.kind === 'run' ? current.parent_id || '' : current?.id || ''" @changed="afterExperimentChanged" @select="selectExperiment" @open-run="openExperimentRun" @logs-changed="refreshSavedViews" />
         </article>
       </div>
       <LegacyBaseMigration v-if="view !== 'run-import'" :nodes="nodes" @migrated="refresh" />

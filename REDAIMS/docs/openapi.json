@@ -664,6 +664,46 @@
         }
       }
     },
+    "/api/v1/runs/{run_id}/delay-analysis": {
+      "get": {
+        "tags": [
+          "timetables"
+        ],
+        "summary": "Delay Analysis",
+        "operationId": "delay_analysis_api_v1_runs__run_id__delay_analysis_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/diagram/lines": {
       "get": {
         "tags": [
@@ -991,6 +1031,257 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/base-timetables/{base_id}/workbook": {
+      "get": {
+        "tags": [
+          "timetables"
+        ],
+        "summary": "Workbook",
+        "operationId": "workbook_api_v1_base_timetables__base_id__workbook_get",
+        "parameters": [
+          {
+            "name": "base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Base Id"
+            }
+          },
+          {
+            "name": "sheet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sheet"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "column_offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Column Offset"
+            }
+          },
+          {
+            "name": "column_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 40,
+              "title": "Column Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/base-timetables/{base_id}/workbook/validate": {
+      "post": {
+        "tags": [
+          "timetables"
+        ],
+        "summary": "Workbook Validate",
+        "operationId": "workbook_validate_api_v1_base_timetables__base_id__workbook_validate_post",
+        "parameters": [
+          {
+            "name": "base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Base Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkbookEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/base-timetables/{base_id}/workbook/save": {
+      "post": {
+        "tags": [
+          "timetables"
+        ],
+        "summary": "Workbook Save",
+        "operationId": "workbook_save_api_v1_base_timetables__base_id__workbook_save_post",
+        "parameters": [
+          {
+            "name": "base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Base Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkbookSave"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/base-timetables/{base_id}/workbook/export": {
+      "get": {
+        "tags": [
+          "timetables"
+        ],
+        "summary": "Workbook Export",
+        "operationId": "workbook_export_api_v1_base_timetables__base_id__workbook_export_get",
+        "parameters": [
+          {
+            "name": "base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Base Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Revision"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2605,6 +2896,25 @@
         }
       }
     },
+    "/api/v1/solver-logs/config": {
+      "get": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Config",
+        "operationId": "config_api_v1_solver_logs_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/runs/{run_id}/solver-logs": {
       "get": {
         "tags": [
@@ -2713,6 +3023,69 @@
         }
       }
     },
+    "/api/v1/runs/{run_id}/solver-logs/{log_id}/text": {
+      "get": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Read Text",
+        "operationId": "read_text_api_v1_runs__run_id__solver_logs__log_id__text_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Log Id"
+            }
+          },
+          {
+            "name": "encoding",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "utf-8",
+                "gb18030"
+              ],
+              "type": "string",
+              "default": "utf-8",
+              "title": "Encoding"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/runs/{run_id}/solver-logs/{log_id}/download": {
       "get": {
         "tags": [
@@ -2740,6 +3113,126 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/solver-logs/{log_id}/classify": {
+      "post": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Classify",
+        "operationId": "classify_api_v1_runs__run_id__solver_logs__log_id__classify_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolverLog"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/solver-logs/{log_id}/visualization": {
+      "post": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Visualization",
+        "operationId": "visualization_api_v1_runs__run_id__solver_logs__log_id__visualization_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisualizationRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2959,25 +3452,6 @@
         }
       }
     },
-    "/api/v1/analysis/logs": {
-      "get": {
-        "tags": [
-          "run-analysis"
-        ],
-        "summary": "All Logs",
-        "operationId": "all_logs_api_v1_analysis_logs_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/runs/{run_id}/analysis-nodes": {
       "post": {
         "tags": [
@@ -3081,44 +3555,269 @@
         }
       }
     },
-    "/api/v1/runs/{run_id}/solver-logs/{log_id}/text": {
+    "/api/v1/analysis/logs": {
       "get": {
         "tags": [
-          "solver-logs"
+          "run-analysis"
         ],
-        "summary": "Read Text",
-        "operationId": "read_text_api_v1_runs__run_id__solver_logs__log_id__text_get",
+        "summary": "All Logs",
+        "operationId": "all_logs_api_v1_analysis_logs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/experiments": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "List Experiments",
+        "operationId": "list_experiments_api_v1_experiments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExperimentDetail"
+                  },
+                  "type": "array",
+                  "title": "Response List Experiments Api V1 Experiments Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Create",
+        "operationId": "create_api_v1_experiments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExperiment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/experiments/runs": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Candidates",
+        "operationId": "candidates_api_v1_experiments_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExperimentRun"
+                  },
+                  "type": "array",
+                  "title": "Response Candidates Api V1 Experiments Runs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/experiments/{experiment_id}": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Detail",
+        "operationId": "detail_api_v1_experiments__experiment_id__get",
         "parameters": [
           {
-            "name": "run_id",
+            "name": "experiment_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Run Id"
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentDetail"
+                }
+              }
             }
           },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Update",
+        "operationId": "update_api_v1_experiments__experiment_id__patch",
+        "parameters": [
           {
-            "name": "log_id",
+            "name": "experiment_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Log Id"
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchExperiment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentDetail"
+                }
+              }
             }
           },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Delete",
+        "operationId": "delete_api_v1_experiments__experiment_id__delete",
+        "parameters": [
           {
-            "name": "encoding",
-            "in": "query",
-            "required": false,
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "enum": [
-                "utf-8",
-                "gb18030"
-              ],
               "type": "string",
-              "default": "utf-8",
-              "title": "Encoding"
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteExperiment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/diagram/lines": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Diagram Context",
+        "operationId": "diagram_context_api_v1_experiments__experiment_id__diagram_lines_get",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
             }
           }
         ],
@@ -3144,24 +3843,34 @@
         }
       }
     },
-    "/api/v1/runs/{run_id}/delay-analysis": {
-      "get": {
+    "/api/v1/experiments/{experiment_id}/diagram/data": {
+      "post": {
         "tags": [
-          "timetables"
+          "experiments"
         ],
-        "summary": "Delay Analysis",
-        "operationId": "delay_analysis_api_v1_runs__run_id__delay_analysis_get",
+        "summary": "Diagram Data",
+        "operationId": "diagram_data_api_v1_experiments__experiment_id__diagram_data_post",
         "parameters": [
           {
-            "name": "run_id",
+            "name": "experiment_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Run Id"
+              "title": "Experiment Id"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperimentPlotRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3183,10 +3892,230 @@
           }
         }
       }
+    },
+    "/api/v1/experiments/{experiment_id}/members": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Add Members",
+        "operationId": "add_members_api_v1_experiments__experiment_id__members_post",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMembers"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Remove Members",
+        "operationId": "remove_members_api_v1_experiments__experiment_id__members_delete",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveMembers"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AddMembers": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "title": "Run Ids"
+          },
+          "batch_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Batch Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "title": "AddMembers"
+      },
+      "AnalysisNodeSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "node_type": {
+            "type": "string",
+            "enum": [
+              "view",
+              "solver-log",
+              "delay"
+            ],
+            "title": "Node Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "node_type",
+          "name",
+          "created_at"
+        ],
+        "title": "AnalysisNodeSummary"
+      },
+      "AnalysisState": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version",
+            "default": 1
+          },
+          "expanded_sections": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Expanded Sections"
+          },
+          "diagram": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreateDiagramView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "log": {
+            "$ref": "#/components/schemas/LogDisplay"
+          },
+          "delay": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DelaySection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AnalysisState"
+      },
       "CatalogCreate": {
         "properties": {
           "kind": {
@@ -3276,17 +4205,34 @@
       },
       "CatalogPatch": {
         "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
           "notes": {
-            "type": "string",
-            "maxLength": 20000,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Notes"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "notes"
-        ],
         "title": "CatalogPatch"
       },
       "Change": {
@@ -3328,6 +4274,42 @@
           "value"
         ],
         "title": "Change"
+      },
+      "ClassificationEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "name"
+        ],
+        "title": "ClassificationEntry"
+      },
+      "ClassificationRequest": {
+        "properties": {
+          "solver_type": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Solver Type",
+            "default": "auto"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ClassificationRequest"
       },
       "Confirmation": {
         "properties": {
@@ -3371,6 +4353,203 @@
         ],
         "title": "Confirmation"
       },
+      "CreateAnalysisNode": {
+        "properties": {
+          "node_type": {
+            "type": "string",
+            "enum": [
+              "view",
+              "solver-log",
+              "delay"
+            ],
+            "title": "Node Type"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AnalysisState"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "node_type",
+          "name",
+          "state"
+        ],
+        "title": "CreateAnalysisNode"
+      },
+      "CreateDiagramView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ViewState"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/PlotSnapshot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "state",
+          "snapshot"
+        ],
+        "title": "CreateDiagramView"
+      },
+      "CreateExperiment": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "owner_category_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Owner Category Id"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "owner_category_id"
+        ],
+        "title": "CreateExperiment"
+      },
+      "DelayDisplay": {
+        "properties": {
+          "station_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Station Ids"
+          },
+          "train_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Train Ids"
+          },
+          "highlighted_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Highlighted Ids"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "seconds",
+              "minutes"
+            ],
+            "title": "Unit"
+          },
+          "chart_height": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 200.0,
+            "title": "Chart Height"
+          },
+          "scroll_top": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Scroll Top"
+          },
+          "scroll_left": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Scroll Left"
+          },
+          "viewport": {
+            "$ref": "#/components/schemas/Viewport"
+          },
+          "station_search": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Station Search",
+            "default": ""
+          },
+          "train_search": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Train Search",
+            "default": ""
+          },
+          "open_panels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "stations",
+                "trains",
+                "issues"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Open Panels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "station_ids",
+          "train_ids",
+          "highlighted_ids",
+          "unit",
+          "chart_height",
+          "scroll_top",
+          "scroll_left",
+          "viewport"
+        ],
+        "title": "DelayDisplay"
+      },
+      "DelaySection": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/DelayDisplay"
+          },
+          "snapshot": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Snapshot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "snapshot"
+        ],
+        "title": "DelaySection"
+      },
       "Delete": {
         "properties": {
           "confirmed": {
@@ -3390,6 +4569,124 @@
           "preview_token"
         ],
         "title": "Delete"
+      },
+      "DeleteExperiment": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirmed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "confirmed"
+        ],
+        "title": "DeleteExperiment"
+      },
+      "DiagramDisplay": {
+        "properties": {
+          "station_search": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Station Search",
+            "default": ""
+          },
+          "train_search": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Train Search",
+            "default": ""
+          },
+          "only_highlighted": {
+            "type": "boolean",
+            "title": "Only Highlighted",
+            "default": false
+          },
+          "train_sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrainSourceDisplay"
+            },
+            "type": "object",
+            "maxProperties": 1000,
+            "title": "Train Sources"
+          },
+          "open_panels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "stations",
+                "trains",
+                "time",
+                "tracks",
+                "details-trains",
+                "styles",
+                "issues"
+              ]
+            },
+            "type": "array",
+            "maxItems": 7,
+            "title": "Open Panels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DiagramDisplay"
+      },
+      "DiagramViewSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "line_ind": {
+            "type": "integer",
+            "title": "Line Ind"
+          },
+          "station_count": {
+            "type": "integer",
+            "title": "Station Count"
+          },
+          "train_count": {
+            "type": "integer",
+            "title": "Train Count"
+          },
+          "highlight_count": {
+            "type": "integer",
+            "title": "Highlight Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "name",
+          "created_at",
+          "line_ind",
+          "station_count",
+          "train_count",
+          "highlight_count"
+        ],
+        "title": "DiagramViewSummary"
       },
       "EditRequest": {
         "properties": {
@@ -3427,11 +4724,6 @@
       },
       "EditorRepairRequest": {
         "properties": {
-          "repair_conflicts": {
-            "type": "boolean",
-            "title": "Repair Conflicts",
-            "default": false
-          },
           "revision": {
             "type": "string",
             "title": "Revision"
@@ -3460,6 +4752,11 @@
             "type": "string",
             "title": "Repair Token"
           },
+          "repair_conflicts": {
+            "type": "boolean",
+            "title": "Repair Conflicts",
+            "default": false
+          },
           "selections": {
             "items": {
               "$ref": "#/components/schemas/TrainChoice"
@@ -3479,6 +4776,219 @@
         ],
         "title": "EditorRepairRequest"
       },
+      "ExperimentDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "owner_category_id": {
+            "type": "string",
+            "title": "Owner Category Id"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "member_mode": {
+            "type": "string",
+            "const": "fixed",
+            "title": "Member Mode"
+          },
+          "classification_path": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationEntry"
+            },
+            "type": "array",
+            "title": "Classification Path"
+          },
+          "member_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Member Ids"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ExperimentRun"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "empty",
+              "ready",
+              "invalid"
+            ],
+            "title": "Status"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "base_tt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Tt Id"
+          },
+          "date_base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Base"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "owner_category_id",
+          "notes",
+          "revision",
+          "member_mode",
+          "classification_path",
+          "member_ids",
+          "member_count",
+          "members",
+          "status",
+          "issues",
+          "base_tt_id",
+          "date_base"
+        ],
+        "title": "ExperimentDetail"
+      },
+      "ExperimentPlotRequest": {
+        "properties": {
+          "revision": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Revision"
+          },
+          "line_ind": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Line Ind"
+          },
+          "overlay_base": {
+            "type": "boolean",
+            "title": "Overlay Base",
+            "default": true
+          },
+          "expanded_stations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Expanded Stations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "line_ind"
+        ],
+        "title": "ExperimentPlotRequest"
+      },
+      "ExperimentRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "run_no": {
+            "type": "integer",
+            "title": "Run No"
+          },
+          "classification_path": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationEntry"
+            },
+            "type": "array",
+            "title": "Classification Path"
+          },
+          "effective_base": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Effective Base"
+          },
+          "date_base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Base"
+          },
+          "unavailable_reason": {
+            "type": "string",
+            "title": "Unavailable Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "batch_id",
+          "name",
+          "run_no",
+          "classification_path",
+          "effective_base",
+          "date_base",
+          "unavailable_reason"
+        ],
+        "title": "ExperimentRun"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3492,12 +5002,13 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "JsonValue": {},
       "LineChoice": {
         "properties": {
           "line_ind": {
             "type": "integer",
-            "maximum": 2147483647,
-            "minimum": 1,
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
             "title": "Line Ind"
           },
           "directions": {
@@ -3521,6 +5032,57 @@
           "directions"
         ],
         "title": "LineChoice"
+      },
+      "LogDisplay": {
+        "properties": {
+          "log_id": {
+            "type": "string",
+            "title": "Log Id",
+            "default": ""
+          },
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "utf-8",
+              "gb18030"
+            ],
+            "title": "Encoding",
+            "default": "utf-8"
+          },
+          "search": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Search",
+            "default": ""
+          },
+          "wrap": {
+            "type": "boolean",
+            "title": "Wrap",
+            "default": true
+          },
+          "scroll_top": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Scroll Top",
+            "default": 0
+          },
+          "scroll_left": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Scroll Left",
+            "default": 0
+          },
+          "visualization_state": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Visualization State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LogDisplay"
       },
       "Move": {
         "properties": {
@@ -3547,6 +5109,59 @@
         ],
         "title": "Move"
       },
+      "PatchExperiment": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "owner_category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Category Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "title": "PatchExperiment"
+      },
       "PlotRequest": {
         "properties": {
           "object_type": {
@@ -3567,7 +5182,7 @@
           },
           "line_ind": {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 1.0,
             "title": "Line Ind"
           },
           "overlay_base": {
@@ -3614,16 +5229,66 @@
         ],
         "title": "PlotRequest"
       },
+      "PlotSnapshot": {
+        "properties": {
+          "context": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Context"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "data"
+        ],
+        "title": "PlotSnapshot"
+      },
+      "RemoveMembers": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Run Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "run_ids"
+        ],
+        "title": "RemoveMembers"
+      },
       "RepairRequest": {
         "properties": {
+          "repair_token": {
+            "type": "string",
+            "title": "Repair Token"
+          },
           "repair_conflicts": {
             "type": "boolean",
             "title": "Repair Conflicts",
             "default": false
-          },
-          "repair_token": {
-            "type": "string",
-            "title": "Repair Token"
           },
           "selections": {
             "items": {
@@ -3697,206 +5362,24 @@
         ],
         "title": "SaveRequest"
       },
-      "SequenceRepairRequest": {
+      "SavedAnalysisNode": {
         "properties": {
-          "repair_token": {
+          "id": {
             "type": "string",
-            "title": "Repair Token"
+            "title": "Id"
           },
-          "train_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 10000,
-            "minItems": 1,
-            "title": "Train Ids"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "repair_token",
-          "train_ids"
-        ],
-        "title": "SequenceRepairRequest"
-      },
-      "Target": {
-        "properties": {
-          "target_category_id": {
+          "run_id": {
             "type": "string",
-            "title": "Target Category Id"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "target_category_id"
-        ],
-        "title": "Target"
-      },
-      "TimeShiftRequest": {
-        "properties": {
-          "revision": {
+            "title": "Run Id"
+          },
+          "node_type": {
             "type": "string",
-            "title": "Revision"
-          },
-          "changes": {
-            "items": {
-              "$ref": "#/components/schemas/Change"
-            },
-            "type": "array",
-            "maxItems": 100000,
-            "title": "Changes"
-          },
-          "date_base": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "view",
+              "solver-log",
+              "delay"
             ],
-            "title": "Date Base"
-          },
-          "train_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 10000,
-            "minItems": 1,
-            "title": "Train Ids"
-          },
-          "offset_seconds": {
-            "type": "integer",
-            "maximum": 2147483647,
-            "minimum": -2147483647,
-            "title": "Offset Seconds"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "revision",
-          "train_ids",
-          "offset_seconds"
-        ],
-        "title": "TimeShiftRequest"
-      },
-      "TrainChoice": {
-        "properties": {
-          "train_id": {
-            "type": "string",
-            "title": "Train Id"
-          },
-          "lines": {
-            "items": {
-              "$ref": "#/components/schemas/LineChoice"
-            },
-            "type": "array",
-            "maxItems": 1000,
-            "minItems": 1,
-            "title": "Lines"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "train_id",
-          "lines"
-        ],
-        "title": "TrainChoice"
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
-      },
-      "SolverLog": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "run_id": {
-            "type": "string",
-            "title": "Run Id"
-          },
-          "filename": {
-            "type": "string",
-            "title": "Filename"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "title": "Size Bytes"
-          },
-          "digest": {
-            "type": "string",
-            "title": "Digest"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "run_id",
-          "filename",
-          "size_bytes",
-          "digest",
-          "created_at"
-        ],
-        "title": "SolverLog"
-      },
-      "DiagramViewSummary": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "run_id": {
-            "type": "string",
-            "title": "Run Id"
+            "title": "Node Type"
           },
           "name": {
             "type": "string",
@@ -3905,221 +5388,22 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
-          },
-          "line_ind": {
-            "type": "integer",
-            "title": "Line Ind"
-          },
-          "station_count": {
-            "type": "integer",
-            "title": "Station Count"
-          },
-          "train_count": {
-            "type": "integer",
-            "title": "Train Count"
-          },
-          "highlight_count": {
-            "type": "integer",
-            "title": "Highlight Count"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "run_id",
-          "name",
-          "created_at",
-          "line_ind",
-          "station_count",
-          "train_count",
-          "highlight_count"
-        ],
-        "title": "DiagramViewSummary"
-      },
-      "CreateDiagramView": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name"
           },
           "state": {
-            "$ref": "#/components/schemas/ViewState"
-          },
-          "snapshot": {
-            "$ref": "#/components/schemas/PlotSnapshot"
+            "$ref": "#/components/schemas/AnalysisState"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
+          "id",
+          "run_id",
+          "node_type",
           "name",
-          "state",
-          "snapshot"
+          "created_at",
+          "state"
         ],
-        "title": "CreateDiagramView"
+        "title": "SavedAnalysisNode"
       },
-      "ViewState": {
-        "properties": {
-          "version": {
-            "type": "integer",
-            "const": 1,
-            "title": "Version",
-            "default": 1
-          },
-          "line_ind": {
-            "type": "integer",
-            "minimum": 1,
-            "title": "Line Ind"
-          },
-          "overlay_base": {
-            "type": "boolean",
-            "title": "Overlay Base"
-          },
-          "reverse": {
-            "type": "boolean",
-            "title": "Reverse"
-          },
-          "station_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 10000,
-            "minItems": 1,
-            "title": "Station Ids"
-          },
-          "train_keys": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 20000,
-            "minItems": 1,
-            "title": "Train Keys"
-          },
-          "highlighted_keys": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 20000,
-            "title": "Highlighted Keys"
-          },
-          "expanded_station_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 10000,
-            "title": "Expanded Station Ids"
-          },
-          "track_station": {
-            "type": "string",
-            "title": "Track Station",
-            "default": ""
-          },
-          "viewport": {
-            "$ref": "#/components/schemas/Viewport"
-          },
-          "from_time": {
-            "type": "string",
-            "maxLength": 40,
-            "title": "From Time",
-            "default": ""
-          },
-          "to_time": {
-            "type": "string",
-            "maxLength": 40,
-            "title": "To Time",
-            "default": ""
-          },
-          "detail_open": {
-            "type": "boolean",
-            "title": "Detail Open",
-            "default": false
-          },
-          "chart_height": {
-            "type": "integer",
-            "maximum": 4000,
-            "minimum": 340,
-            "title": "Chart Height",
-            "default": 600
-          },
-          "display": {
-            "$ref": "#/components/schemas/DiagramDisplay"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "line_ind",
-          "overlay_base",
-          "reverse",
-          "station_ids",
-          "train_keys",
-          "highlighted_keys",
-          "expanded_station_ids",
-          "viewport"
-        ],
-        "title": "ViewState"
-      },
-      "Viewport": {
-        "properties": {
-          "x0": {
-            "type": "number",
-            "title": "X0"
-          },
-          "x1": {
-            "type": "number",
-            "title": "X1"
-          },
-          "y0": {
-            "type": "number",
-            "title": "Y0"
-          },
-          "y1": {
-            "type": "number",
-            "title": "Y1"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "x0",
-          "x1",
-          "y0",
-          "y1"
-        ],
-        "title": "Viewport"
-      },
-      "PlotSnapshot": {
-        "properties": {
-          "context": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Context"
-          },
-          "data": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Data"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "context",
-          "data"
-        ],
-        "title": "PlotSnapshot"
-      },
-      "JsonValue": {},
       "SavedDiagramView": {
         "properties": {
           "id": {
@@ -4176,7 +5460,31 @@
         ],
         "title": "SavedDiagramView"
       },
-      "AnalysisNodeSummary": {
+      "SequenceRepairRequest": {
+        "properties": {
+          "repair_token": {
+            "type": "string",
+            "title": "Repair Token"
+          },
+          "train_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Train Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "repair_token",
+          "train_ids"
+        ],
+        "title": "SequenceRepairRequest"
+      },
+      "SolverLog": {
         "properties": {
           "id": {
             "type": "string",
@@ -4186,65 +5494,208 @@
             "type": "string",
             "title": "Run Id"
           },
-          "node_type": {
+          "filename": {
             "type": "string",
-            "enum": [
-              "view",
-              "solver-log",
-              "delay"
-            ],
-            "title": "Node Type"
+            "title": "Filename"
           },
-          "name": {
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "digest": {
             "type": "string",
-            "title": "Name"
+            "title": "Digest"
           },
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "solver_type": {
+            "type": "string",
+            "title": "Solver Type",
+            "default": "unknown"
+          },
+          "default_plotter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Plotter"
+          },
+          "detection": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Detection"
           }
         },
         "type": "object",
         "required": [
           "id",
           "run_id",
-          "node_type",
-          "name",
+          "filename",
+          "size_bytes",
+          "digest",
           "created_at"
         ],
-        "title": "AnalysisNodeSummary"
+        "title": "SolverLog"
       },
-      "CreateAnalysisNode": {
+      "Target": {
         "properties": {
-          "node_type": {
+          "target_category_id": {
             "type": "string",
-            "enum": [
-              "view",
-              "solver-log",
-              "delay"
-            ],
-            "title": "Node Type"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "state": {
-            "$ref": "#/components/schemas/AnalysisState"
+            "title": "Target Category Id"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "node_type",
-          "name",
-          "state"
+          "target_category_id"
         ],
-        "title": "CreateAnalysisNode"
+        "title": "Target"
       },
-      "AnalysisState": {
+      "TimeShiftRequest": {
+        "properties": {
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "type": "array",
+            "maxItems": 100000,
+            "title": "Changes"
+          },
+          "date_base": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Base"
+          },
+          "train_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Train Ids"
+          },
+          "offset_seconds": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": -2147483647.0,
+            "title": "Offset Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "train_ids",
+          "offset_seconds"
+        ],
+        "title": "TimeShiftRequest"
+      },
+      "TrainChoice": {
+        "properties": {
+          "train_id": {
+            "type": "string",
+            "title": "Train Id"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LineChoice"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "train_id",
+          "lines"
+        ],
+        "title": "TrainChoice"
+      },
+      "TrainSourceDisplay": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "all",
+              "selected"
+            ],
+            "title": "Mode",
+            "default": "selected"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TrainSourceDisplay"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ViewState": {
         "properties": {
           "version": {
             "type": "integer",
@@ -4252,54 +5703,133 @@
             "title": "Version",
             "default": 1
           },
-          "expanded_sections": {
+          "line_ind": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Line Ind"
+          },
+          "overlay_base": {
+            "type": "boolean",
+            "title": "Overlay Base"
+          },
+          "reverse": {
+            "type": "boolean",
+            "title": "Reverse"
+          },
+          "station_ids": {
             "items": {
-              "type": "string",
-              "enum": [
-                "diagram",
-                "log",
-                "delay"
-              ]
+              "type": "string"
             },
             "type": "array",
-            "maxItems": 3,
-            "title": "Expanded Sections"
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Station Ids"
           },
-          "diagram": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CreateDiagramView"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "train_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Train Keys"
           },
-          "log": {
-            "$ref": "#/components/schemas/LogDisplay"
+          "highlighted_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Highlighted Keys"
           },
-          "delay": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DelaySection"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "expanded_station_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Expanded Station Ids"
+          },
+          "track_station": {
+            "type": "string",
+            "title": "Track Station",
+            "default": ""
+          },
+          "viewport": {
+            "$ref": "#/components/schemas/Viewport"
+          },
+          "from_time": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "From Time",
+            "default": ""
+          },
+          "to_time": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "To Time",
+            "default": ""
+          },
+          "detail_open": {
+            "type": "boolean",
+            "title": "Detail Open",
+            "default": false
+          },
+          "chart_height": {
+            "type": "integer",
+            "maximum": 4000.0,
+            "minimum": 340.0,
+            "title": "Chart Height",
+            "default": 600
+          },
+          "display": {
+            "$ref": "#/components/schemas/DiagramDisplay"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "AnalysisState"
+        "required": [
+          "line_ind",
+          "overlay_base",
+          "reverse",
+          "station_ids",
+          "train_keys",
+          "highlighted_keys",
+          "expanded_station_ids",
+          "viewport"
+        ],
+        "title": "ViewState"
       },
-      "LogDisplay": {
+      "Viewport": {
         "properties": {
-          "log_id": {
-            "type": "string",
-            "title": "Log Id",
-            "default": ""
+          "x0": {
+            "type": "number",
+            "title": "X0"
           },
+          "x1": {
+            "type": "number",
+            "title": "X1"
+          },
+          "y0": {
+            "type": "number",
+            "title": "Y0"
+          },
+          "y1": {
+            "type": "number",
+            "title": "Y1"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "x0",
+          "x1",
+          "y0",
+          "y1"
+        ],
+        "title": "Viewport"
+      },
+      "VisualizationRequest": {
+        "properties": {
           "encoding": {
             "type": "string",
             "enum": [
@@ -4309,232 +5839,137 @@
             "title": "Encoding",
             "default": "utf-8"
           },
-          "search": {
-            "type": "string",
-            "maxLength": 1000,
-            "title": "Search",
-            "default": ""
-          },
-          "wrap": {
-            "type": "boolean",
-            "title": "Wrap",
-            "default": true
-          },
-          "scroll_top": {
-            "type": "number",
-            "minimum": 0,
-            "title": "Scroll Top",
-            "default": 0
-          },
-          "scroll_left": {
-            "type": "number",
-            "minimum": 0,
-            "title": "Scroll Left",
-            "default": 0
-          },
-          "visualization_state": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Visualization State"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "LogDisplay"
-      },
-      "DelaySection": {
-        "properties": {
-          "state": {
-            "$ref": "#/components/schemas/DelayDisplay"
-          },
-          "snapshot": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Snapshot"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "state",
-          "snapshot"
-        ],
-        "title": "DelaySection"
-      },
-      "DelayDisplay": {
-        "properties": {
-          "station_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 10000,
-            "title": "Station Ids"
-          },
-          "train_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 20000,
-            "title": "Train Ids"
-          },
-          "highlighted_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 20000,
-            "title": "Highlighted Ids"
-          },
-          "unit": {
-            "type": "string",
-            "enum": [
-              "seconds",
-              "minutes"
+          "plotter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Unit"
+            "title": "Plotter Id"
           },
-          "chart_height": {
+          "options": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Options"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VisualizationRequest"
+      },
+      "WorkbookCellChange": {
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "maxLength": 31,
+            "minLength": 1,
+            "title": "Sheet"
+          },
+          "row": {
             "type": "integer",
-            "maximum": 1000,
-            "minimum": 200,
-            "title": "Chart Height"
+            "maximum": 1048576.0,
+            "minimum": 2.0,
+            "title": "Row"
           },
-          "scroll_top": {
-            "type": "number",
-            "minimum": 0,
-            "title": "Scroll Top"
+          "column": {
+            "type": "integer",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "title": "Column"
           },
-          "scroll_left": {
-            "type": "number",
-            "minimum": 0,
-            "title": "Scroll Left"
-          },
-          "viewport": {
-            "$ref": "#/components/schemas/Viewport"
-          },
-          "station_search": {
-            "type": "string",
-            "maxLength": 1000,
-            "title": "Station Search",
-            "default": ""
-          },
-          "train_search": {
-            "type": "string",
-            "maxLength": 1000,
-            "title": "Train Search",
-            "default": ""
-          },
-          "open_panels": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "stations",
-                "trains",
-                "issues"
-              ]
-            },
-            "type": "array",
-            "maxItems": 3,
-            "title": "Open Panels"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "station_ids",
-          "train_ids",
-          "highlighted_ids",
-          "unit",
-          "chart_height",
-          "scroll_top",
-          "scroll_left",
-          "viewport"
-        ],
-        "title": "DelayDisplay"
-      },
-      "SavedAnalysisNode": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "run_id": {
-            "type": "string",
-            "title": "Run Id"
-          },
-          "node_type": {
-            "type": "string",
-            "enum": [
-              "view",
-              "solver-log",
-              "delay"
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32767
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Node Type"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At"
-          },
-          "state": {
-            "$ref": "#/components/schemas/AnalysisState"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "run_id",
-          "node_type",
-          "name",
-          "created_at",
-          "state"
-        ],
-        "title": "SavedAnalysisNode"
-      },
-      "DiagramDisplay": {
-        "properties": {
-          "station_search": {
-            "type": "string",
-            "maxLength": 1000,
-            "title": "Station Search",
-            "default": ""
-          },
-          "train_search": {
-            "type": "string",
-            "maxLength": 1000,
-            "title": "Train Search",
-            "default": ""
-          },
-          "open_panels": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "stations",
-                "trains",
-                "time",
-                "tracks",
-                "details-trains",
-                "styles",
-                "issues"
-              ]
-            },
-            "type": "array",
-            "maxItems": 7,
-            "title": "Open Panels"
+            "title": "Value"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "DiagramDisplay"
+        "required": [
+          "sheet",
+          "row",
+          "column",
+          "value"
+        ],
+        "title": "WorkbookCellChange"
+      },
+      "WorkbookEdit": {
+        "properties": {
+          "revision": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Revision"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkbookCellChange"
+            },
+            "type": "array",
+            "maxItems": 50000,
+            "minItems": 1,
+            "title": "Changes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "changes"
+        ],
+        "title": "WorkbookEdit"
+      },
+      "WorkbookSave": {
+        "properties": {
+          "revision": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Revision"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkbookCellChange"
+            },
+            "type": "array",
+            "maxItems": 50000,
+            "minItems": 1,
+            "title": "Changes"
+          },
+          "validation_token": {
+            "type": "string",
+            "title": "Validation Token"
+          },
+          "warnings_confirmed": {
+            "type": "boolean",
+            "title": "Warnings Confirmed",
+            "default": false
+          },
+          "train_dates_confirmed": {
+            "type": "boolean",
+            "title": "Train Dates Confirmed",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "changes",
+          "validation_token"
+        ],
+        "title": "WorkbookSave"
       }
     }
   }

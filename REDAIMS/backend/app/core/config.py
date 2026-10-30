@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseModel):
+    solver_log_config: Path = ROOT / "solver_logs.json"
     database: Path = ROOT / "data/rail_data.duckdb"
     source_files: Path | None = None
     staging: Path | None = None

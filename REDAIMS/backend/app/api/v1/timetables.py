@@ -10,6 +10,7 @@ from app.base_timetables.migration import MigrationService
 from app.base_timetables.service import Confirmation, Delete, Move, Options, Target
 from app.base_timetables.time_shift import TimeShiftRequest, TimeShiftService
 from app.base_timetables.track_repair import EditorRepairRequest, RepairRequest, TrackRepairService
+from app.base_timetables.workbooks import WorkbookEdit, WorkbookSave, WorkbookService
 from app.diagram.service import PlotRequest, PlotService
 from app.ingest.base_service import ImportConflict, encode
 from app.ingest.run_service import RunImportService, RunOptions
@@ -41,6 +42,7 @@ def router(service, settings):
     editor = EditorService(service)
     time_shifter = TimeShiftService(editor)
     exporter = ExportService(editor)
+    workbooks = WorkbookService(editor)
     repairer = TrackRepairService(editor)
     sequence_repairer = SequenceRepairService(service)
     plotter = PlotService(editor)
@@ -169,6 +171,41 @@ def router(service, settings):
     @guarded
     def detail(base_id: str):
         return service.detail(base_id)
+
+    @api.get("/base-timetables/{base_id}/workbook")
+    @guarded
+    def workbook(
+        base_id: str,
+        sheet: str | None = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=100)] = 25,
+        column_offset: Annotated[int, Query(ge=0)] = 0,
+        column_limit: Annotated[int, Query(ge=1, le=100)] = 40,
+    ):
+        return workbooks.read(base_id, sheet, offset, limit, column_offset, column_limit)
+
+    @api.post("/base-timetables/{base_id}/workbook/validate")
+    @guarded
+    def workbook_validate(base_id: str, payload: WorkbookEdit):
+        return workbooks.validate(base_id, payload)
+
+    @api.post("/base-timetables/{base_id}/workbook/save")
+    @guarded
+    def workbook_save(base_id: str, payload: WorkbookSave):
+        return workbooks.save(base_id, payload)
+
+    @api.get("/base-timetables/{base_id}/workbook/export")
+    @guarded
+    def workbook_export(base_id: str, revision: str):
+        content, filename = workbooks.export(base_id, revision)
+        return Response(
+            content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": "attachment; filename*=UTF-8''" + quote(filename),
+                "Cache-Control": "no-store",
+            },
+        )
 
     @api.get("/base-timetables/{base_id}/tables")
     @guarded

@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { request } from '../api/baseImport'
 import { chooseDestination, chooseOriginal, digest, downloadWorkbook, filePickers, renderWorkbook, writeWorkbook, type ExportOptions, type WorkbookHandle } from '../api/workbookExport'
 const props = defineProps<{ url: string; revision: string; objectType: 'base' | 'run' }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; backupUpdated: [] }>()
 const dialog = ref<HTMLDialogElement | null>(null), options = ref<ExportOptions | null>(null)
 const selected = ref<string[]>([]), mode = ref('new'), filename = ref(''), source = ref<File | null>(null)
 const busy = ref(false), error = ref(''), status = ref('')
@@ -36,6 +36,7 @@ async function exportFile() {
       fingerprint = await digest(original)
     } else if (filePickers().showSaveFilePicker) handle = await chooseDestination(filename.value)
     const result = await renderWorkbook(props.url, options.value, selected.value, original)
+    emit('backupUpdated')
     if (handle) { await writeWorkbook(handle, result, fingerprint); status.value = `已导出：${handle.name}` }
     else {
       downloadWorkbook(result, mode.value === 'replace' && original ? original.name : filename.value)
@@ -49,11 +50,11 @@ async function exportFile() {
 </script>
 <template><dialog ref="dialog" class="category-picker export-dialog" aria-labelledby="export-title" @cancel.prevent="!busy && emit('close')">
   <h2 id="export-title">导出 Excel</h2>
-  <p>导出已保存的完整数据；车站和列车显示筛选不限制导出范围。</p>
+  <p>先将已保存的数据更新到受管Excel工作副本，再导出完整工作簿。原文件中的其他线路数据表、未勾选的表单都会保留；车站和列车显示筛选不限制更新范围。</p>
   <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="status" role="status">{{ status }}</p>
-  <fieldset :disabled="busy" class="import-fields"><legend>选择要导出的表单</legend>
+  <fieldset :disabled="busy" class="import-fields"><legend>选择从数据库更新的表单</legend>
     <label v-for="sheet in options?.sheets" :key="sheet.key" class="confirmation"><input v-model="selected" type="checkbox" :value="sheet.key" />{{ sheet.name }} · {{ sheet.label }}（{{ sheet.rows }} 行）</label>
-    <p class="muted">{{ objectType === 'base' ? '基本图默认导出时刻表及三张基础表。' : 'run默认仅导出时刻表；基础表可勾选，来自当前有效基本图。' }}</p>
+    <p class="muted">{{ objectType === 'base' ? '默认更新基本图四表。' : '默认更新run时刻表及当前有效基本图提供的三张基础表；缺少基本图时仅更新时刻表。' }}未勾选表示保留副本中的原内容，不会从导出文件中删除表单。</p>
     <strong>是否覆盖原有Excel文件中的所选表单？</strong>
     <label class="confirmation"><input v-model="mode" type="radio" value="new" />否，另存为新的Excel文件</label>
     <label class="confirmation"><input v-model="mode" type="radio" value="replace" />是，选择源文件并替换其中的同名表单</label>

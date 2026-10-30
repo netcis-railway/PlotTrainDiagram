@@ -144,6 +144,9 @@ class TimetableService(BaseImportService):
 
     def _detail(self, c, row):
         doc = json.loads(row[5])
+        working = c.execute(
+            "SELECT managed_name,digest FROM base_tt_workbooks WHERE base_tt_id=?", [row[0]]
+        ).fetchone()
         return {
             "id": row[0],
             "base_tt_id": row[0],
@@ -156,6 +159,12 @@ class TimetableService(BaseImportService):
             "classification_path": self.category(c, row[2]),
             "summary": self.summarize(doc),
             "metadata": {"issues": doc.get("issues", [])},
+            "working_file": {
+                "managed_path": str((self.sources / working[0]).resolve()),
+                "digest": working[1],
+            }
+            if working
+            else None,
             "source_files": [
                 {
                     "id": r[0],
@@ -509,6 +518,9 @@ class TimetableService(BaseImportService):
                     }
                     self.identify(c, doc)
                     if old:
+                        from app.base_timetables.workbooks import discard_workbook
+
+                        discard_workbook(c, base_id)
                         for (managed,) in c.execute(
                             "SELECT managed_name FROM base_tt_sources WHERE base_tt_id=?", [base_id]
                         ).fetchall():
@@ -573,7 +585,10 @@ class TimetableService(BaseImportService):
         return {"state": "cancelled"}
 
     def recover(self):
+        from app.base_timetables.workbooks import recover_workbooks
+
         super().recover()
+        recover_workbooks(self)
         with self.database.transaction() as c:
             for job_id, state in c.execute(
                 "SELECT id,state FROM base_tt_jobs WHERE state IN "
@@ -646,6 +661,8 @@ class TimetableService(BaseImportService):
             }
 
     def delete(self, base_id, payload: Delete):
+        from app.base_timetables.workbooks import discard_workbook
+
         with self.database.lock:
             preview = self.deletion_preview(base_id)
             if preview["preview_token"] != payload.preview_token:
@@ -653,6 +670,7 @@ class TimetableService(BaseImportService):
             if not preview["can_delete"]:
                 raise ValueError("基本图仍被下级类别或 run 使用，请先处理依赖或移动位置")
             with self.database.transaction() as c:
+                discard_workbook(c, base_id)
                 for (name,) in c.execute(
                     "SELECT managed_name FROM base_tt_sources WHERE base_tt_id=?", [base_id]
                 ).fetchall():

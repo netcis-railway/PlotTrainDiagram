@@ -24,6 +24,8 @@ export const api = {
 }
 
 export interface DeletionPreview {
+  owned_experiments?: { id: string; name: string; owner_category_id: string }[];
+  member_experiments?: { id: string; name: string; run_id: string }[];
   node_count: number; run_count: number; preview_token: string; can_delete: boolean; physical_base_timetables: { id: string; name: string; owner_category_id: string }[]; legacy_base_ids: string[];
   nodes: { id: string; name: string; kind: Kind }[];
   runs: { id: string; name: string; run_no: number }[];
