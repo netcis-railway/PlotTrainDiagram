@@ -51,7 +51,8 @@ class EditorService:
             infrastructure = doc
         else:
             row = c.execute(
-                "SELECT r.id,r.batch_id,r.name,r.run_no,w.date_base,w.revision "
+                "SELECT r.id,r.batch_id,r.name,r.run_no,w.date_base,w.revision,"
+                "r.notes,r.analysis_notes "
                 "FROM runs r LEFT JOIN run_working_data w ON w.run_id=r.id WHERE "
                 "r.id=? AND r.id NOT IN (SELECT run_id FROM base_run_data WHERE "
                 "role='base')",
@@ -69,6 +70,8 @@ class EditorService:
                 "classification_path": path,
                 "object_type": "run",
                 "revision": row[5] or 0,
+                "notes": row[6] or "",
+                "analysis_notes": json.loads(row[7] or "{}"),
             }
             state = self.base.state(c)
             effective = self.base.resolve_state(state, row[1])
@@ -135,7 +138,15 @@ class EditorService:
                             "node_name_chn": e["node_name_chn"],
                         }
                     )
-        revision = token([meta, doc, self.base.state(c), infrastructure.get("members", [])])
+        # Display-only run metadata must not invalidate timetable drafts or validation.
+        revision_meta = {
+            k: v
+            for k, v in meta.items()
+            if kind != "run" or k not in ("name", "notes", "analysis_notes")
+        }
+        revision_state = self.base.state(c)
+        revision_state["runs"] = [row[:2] for row in revision_state["runs"]]
+        revision = token([revision_meta, doc, revision_state, infrastructure.get("members", [])])
         return meta, doc, infrastructure, revision
 
     def read(self, kind, object_id):
@@ -161,6 +172,19 @@ class EditorService:
             return {
                 "object": meta,
                 "revision": revision,
+                # Upgrade compatible browser drafts only when their old data hash still matches.
+                "legacy_revision": token(
+                    [
+                        {
+                            k: v
+                            for k, v in meta.items()
+                            if kind != "run" or k not in ("notes", "analysis_notes")
+                        },
+                        doc,
+                        self.base.state(c),
+                        infrastructure.get("members", []),
+                    ]
+                ),
                 "nodes": display_nodes,
                 "route_nodes": route,
                 "display_lines": [

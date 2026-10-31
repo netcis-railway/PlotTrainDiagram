@@ -1,4 +1,5 @@
 import { request, post, type Change, type ClassificationEntry, type EditorData, type EventTime } from './baseImport'
+import type { AnalysisSection, SectionNotes } from './analysis'
 export interface PlotIssue { code: string; severity: 'error' | 'warning'; message: string; train_course_id?: string; event_id?: string }
 export interface PlotBase { id: string; baseTT_no: string; name: string; date_base: string; revision: number; classification_path: ClassificationEntry[]; owner_category_id: string }
 export interface PlotLine { line_ind: number; line_code: string; line_name_chn: string; station_count: number; available: boolean; issues: PlotIssue[] }
@@ -21,14 +22,17 @@ export interface DiagramViewState {
   from_time: string; to_time: string; detail_open: boolean; chart_height: number
   display?: { station_search: string; train_search: string; open_panels: string[]; only_highlighted?: boolean; train_sources?: Record<string, TrainSourceDisplay> }
 }
-export interface DiagramViewSummary { id: string; run_id: string; name: string; created_at: string; line_ind: number; station_count: number; train_count: number; highlight_count: number }
-export interface CreateDiagramView { name: string; state: DiagramViewState; snapshot: { context: PlotContext; data: PlotData } }
+export interface DiagramViewSummary { id: string; run_id: string; name: string; created_at: string; notes?: string; section_notes?: SectionNotes; line_ind: number; station_count: number; train_count: number; highlight_count: number }
+export interface CreateDiagramView { name: string; notes?: string; section_notes?: SectionNotes; state: DiagramViewState; snapshot: { context: PlotContext; data: PlotData } }
 export interface SavedDiagramView extends DiagramViewSummary { state: DiagramViewState; snapshot: CreateDiagramView['snapshot'] }
 export const diagramApi = {
+  viewSectionNote: (run: string, id: string, section: AnalysisSection, notes: string | null) => request<DiagramViewSummary>(`/runs/${encodeURIComponent(run)}/diagram-views/${encodeURIComponent(id)}/section-notes`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section, notes }) }),
   experimentContext: (id: string) => request<PlotContext>(`/experiments/${encodeURIComponent(id)}/diagram/lines`),
   experimentData: (id: string, body: { revision: string; line_ind: number; overlay_base: boolean; expanded_stations: string[] }) => post<PlotData>(`/experiments/${encodeURIComponent(id)}/diagram/data`, body),
   views: () => request<DiagramViewSummary[]>('/diagram/views'),
+  deleteView: (runId: string, viewId: string) => request(`/runs/${encodeURIComponent(runId)}/diagram-views/${encodeURIComponent(viewId)}`, { method: 'DELETE' }),
   saveView: (runId: string, body: CreateDiagramView) => post<DiagramViewSummary>(`/runs/${encodeURIComponent(runId)}/diagram-views`, body),
+  updateView: (runId: string, viewId: string, body: { name: string; notes: string }) => request<DiagramViewSummary>(`/runs/${encodeURIComponent(runId)}/diagram-views/${encodeURIComponent(viewId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   view: (runId: string, viewId: string) => request<SavedDiagramView>(`/runs/${encodeURIComponent(runId)}/diagram-views/${encodeURIComponent(viewId)}`),
   context: (kind: 'base' | 'run', id: string) => request<PlotContext>(`/diagram/lines?${new URLSearchParams({ object_type: kind, object_id: id })}`),
   data: (body: { object_type: 'base' | 'run'; object_id: string; revision: string; line_ind: number; overlay_base: boolean; expanded_stations?: string[]; changes: Change[]; date_base?: string }) => post<PlotData>('/diagram/data', body),

@@ -1,15 +1,18 @@
 import json
+import math
 from hashlib import sha256
 from pathlib import PurePosixPath
 from typing import Literal
 from urllib.parse import quote
 from uuid import uuid4
 
+from app.api.v1.run_metadata import SectionNotes, SectionNoteUpdate
 from app.solver_visualizers.configuration import ConfigurationError, identify, read_configuration
 from app.solver_visualizers.rendering import render_plot
+from app.solver_visualizers.results import extract_results
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 from starlette.concurrency import run_in_threadpool
 
 MAX_LOG_BYTES = 32 * 1024 * 1024
@@ -25,6 +28,33 @@ class SolverLog(BaseModel):
     solver_type: str = "unknown"
     default_plotter: str | None = None
     detection: dict[str, JsonValue] = Field(default_factory=dict)
+    section_notes: SectionNotes = Field(default_factory=dict)
+    best_objective: float | None = None
+    solve_seconds: float | None = None
+    objective_source: Literal["solver-log", "manual", "unavailable"] = "unavailable"
+    time_source: Literal["solver-log", "manual", "unavailable"] = "unavailable"
+    result_extraction: dict[str, JsonValue] = Field(default_factory=dict)
+    result_warnings: list[str] = Field(default_factory=list)
+
+
+class SolverResultUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    best_objective: float | None = Field(default=None, allow_inf_nan=False, strict=True)
+    solve_seconds: float | None = Field(default=None, ge=0, allow_inf_nan=False, strict=True)
+
+    @field_validator("best_objective", "solve_seconds", mode="before")
+    @classmethod
+    def finite_input(cls, value):
+        if isinstance(value, float) and not math.isfinite(value):
+            # Keep non-finite JSON values out of validation-error response serialization too.
+            raise HTTPException(422, "目标值和求解时间必须是有限数值")
+        return value
+
+    @model_validator(mode="after")
+    def require_field(self):
+        if not self.model_fields_set:
+            raise ValueError("请填写目标函数最优值或求解时间")
+        return self
 
 
 class ClassificationRequest(BaseModel):
@@ -49,7 +79,9 @@ class VisualizationRequest(BaseModel):
 def router(database, config_path=None):
     api = APIRouter(prefix="/api/v1", tags=["solver-logs"])
     columns = (
-        "id,run_id,filename,size_bytes,digest,created_at,solver_type,default_plotter,detection"
+        "id,run_id,filename,size_bytes,digest,created_at,solver_type,default_plotter,"
+        "detection,section_notes,best_objective,solve_seconds,objective_source,time_source,"
+        "result_extraction"
     )
 
     def configuration():
@@ -73,6 +105,17 @@ def router(database, config_path=None):
             raise HTTPException(404, "run 不存在")
 
     def info(row):
+        warnings = []
+        for value, source, label in (
+            (row[10], row[12], "目标函数最优值"),
+            (row[11], row[13], "求解时间"),
+        ):
+            if value is None:
+                warnings.append(
+                    f"未能从日志中获取{label}，请人工填写。"
+                    if source != "manual"
+                    else f"{label}尚未填写。"
+                )
         return {
             **dict(
                 zip(
@@ -84,6 +127,13 @@ def router(database, config_path=None):
             "solver_type": row[6] or "unknown",
             "default_plotter": row[7],
             "detection": json.loads(row[8] or "{}"),
+            "section_notes": json.loads(row[9] or "{}"),
+            "best_objective": row[10],
+            "solve_seconds": row[11],
+            "objective_source": row[12] or "unavailable",
+            "time_source": row[13] or "unavailable",
+            "result_extraction": json.loads(row[14] or "{}"),
+            "result_warnings": warnings,
         }
 
     @api.get("/runs/{run_id}/solver-logs", response_model=list[SolverLog])
@@ -102,6 +152,7 @@ def router(database, config_path=None):
     def save_log(run_id, filename, content):
         value, revision = configuration()
         classified = identify(content, value, revision)
+        result = extract_results(content, classified["detection"]["encoding"])
         with database.transaction() as connection:
             check_run(connection, run_id)
             digest = sha256(content).hexdigest()
@@ -111,11 +162,34 @@ def router(database, config_path=None):
                 [run_id, filename, digest],
             ).fetchone()
             if previous:
+                # Re-import upgrades older attachments once, retaining manual values.
+                if not json.loads(previous[14] or "{}"):
+                    best = previous[10] if previous[12] == "manual" else result["best_objective"]
+                    seconds = previous[11] if previous[13] == "manual" else result["solve_seconds"]
+                    objective_source = (
+                        "manual" if previous[12] == "manual" else result["objective_source"]
+                    )
+                    time_source = "manual" if previous[13] == "manual" else result["time_source"]
+                    previous = connection.execute(
+                        "UPDATE run_solver_logs SET best_objective=?,solve_seconds=?,"
+                        f"objective_source=?,time_source=?,result_extraction=? WHERE id=? "
+                        f"RETURNING {columns}",
+                        [
+                            best,
+                            seconds,
+                            objective_source,
+                            time_source,
+                            json.dumps(result["result_extraction"]),
+                            previous[0],
+                        ],
+                    ).fetchone()
                 return info(previous)
             log_id = str(uuid4())
             row = connection.execute(
                 "INSERT INTO run_solver_logs (id,run_id,filename,size_bytes,digest,content,"
-                "solver_type,default_plotter,detection) VALUES (?,?,?,?,?,?,?,?,?) "
+                "solver_type,default_plotter,detection,best_objective,solve_seconds,"
+                "objective_source,time_source,result_extraction) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 f"RETURNING {columns}",
                 [
                     log_id,
@@ -127,6 +201,11 @@ def router(database, config_path=None):
                     classified["solver_type"],
                     classified["default_plotter"],
                     json.dumps(classified["detection"]),
+                    result["best_objective"],
+                    result["solve_seconds"],
+                    result["objective_source"],
+                    result["time_source"],
+                    json.dumps(result["result_extraction"]),
                 ],
             ).fetchone()
             return info(row)
@@ -158,6 +237,38 @@ def router(database, config_path=None):
         if not content:
             raise HTTPException(422, "日志文件不能为空")
         return await run_in_threadpool(save_log, run_id, filename, bytes(content))
+
+    @api.get("/runs/{run_id}/solver-logs/{log_id}", response_model=SolverLog)
+    def metadata(run_id: str, log_id: str):
+        with database.transaction() as c:
+            check_run(c, run_id)
+            row = c.execute(
+                f"SELECT {columns} FROM run_solver_logs WHERE run_id=? AND id=?", [run_id, log_id]
+            ).fetchone()
+            if not row:
+                raise HTTPException(404, "求解日志不存在")
+            return info(row)
+
+    @api.patch("/runs/{run_id}/solver-logs/{log_id}", response_model=SolverLog)
+    def update_results(run_id: str, log_id: str, payload: SolverResultUpdate):
+        with database.transaction() as c:
+            check_run(c, run_id)
+            assignments, values = [], []
+            for field, source in (
+                ("best_objective", "objective_source"),
+                ("solve_seconds", "time_source"),
+            ):
+                if field in payload.model_fields_set:
+                    assignments.extend([f"{field}=?", f"{source}='manual'"])
+                    values.append(getattr(payload, field))
+            row = c.execute(
+                f"UPDATE run_solver_logs SET {','.join(assignments)} WHERE run_id=? AND id=? "
+                f"RETURNING {columns}",
+                [*values, run_id, log_id],
+            ).fetchone()
+            if not row:
+                raise HTTPException(404, "求解日志不存在")
+            return info(row)
 
     @api.get("/runs/{run_id}/solver-logs/{log_id}/text")
     def read_text(run_id: str, log_id: str, encoding: Literal["utf-8", "gb18030"] = "utf-8"):
@@ -256,5 +367,50 @@ def router(database, config_path=None):
             raise HTTPException(503, str(error)) from error
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
+
+    @api.patch("/runs/{run_id}/solver-logs/{log_id}/section-notes", response_model=SolverLog)
+    def update_section_notes(run_id: str, log_id: str, payload: SectionNoteUpdate):
+        with database.transaction() as c:
+            check_run(c, run_id)
+            current = c.execute(
+                "SELECT section_notes FROM run_solver_logs WHERE run_id=? AND id=?",
+                [run_id, log_id],
+            ).fetchone()
+            if not current:
+                raise HTTPException(404, "求解日志不存在")
+            notes = json.loads(current[0] or "{}") | {payload.section: payload.notes}
+            row = c.execute(
+                "UPDATE run_solver_logs SET section_notes=? WHERE run_id=? AND id=? "
+                f"RETURNING {columns}",
+                [json.dumps(notes, ensure_ascii=False), run_id, log_id],
+            ).fetchone()
+            return info(row)
+
+    @api.delete("/runs/{run_id}/solver-logs/{log_id}")
+    def delete_log(run_id: str, log_id: str):
+        with database.transaction() as connection:
+            check_run(connection, run_id)
+            if not connection.execute(
+                "SELECT 1 FROM run_solver_logs WHERE run_id=? AND id=?", [run_id, log_id]
+            ).fetchone():
+                raise HTTPException(404, "求解日志不存在")
+            references = connection.execute(
+                "SELECT name FROM run_analysis_nodes WHERE run_id=? "
+                "AND json_extract_string(state, '$.log.log_id')=? ORDER BY created_at,id",
+                [run_id, log_id],
+            ).fetchall()
+            if references:
+                names = "、".join(f"“{row[0]}”" for row in references[:5])
+                if len(references) > 5:
+                    names += "等"
+                raise HTTPException(
+                    409,
+                    f"该日志仍被{len(references)}个已保存分析节点引用（{names}），"
+                    "请先删除这些分析节点，再删除日志文件。",
+                )
+            connection.execute(
+                "DELETE FROM run_solver_logs WHERE run_id=? AND id=?", [run_id, log_id]
+            )
+            return {"deleted_log_id": log_id}
 
     return api

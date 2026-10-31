@@ -269,10 +269,13 @@ repair_conflicts=true时，按context列车顺序保留先出现的既有占用�
 
 - GET /api/v1/diagram/views：分类树使用的全部普通run视图摘要，排除旧版role=base对象，不返回快照。
 - GET /api/v1/runs/{run_id}/diagram-views：当前run的视图摘要列表。
-- POST /api/v1/runs/{run_id}/diagram-views：提交name、state、snapshot，成功201，返回视图摘要；不会修改时刻表或修订号。
+- POST /api/v1/runs/{run_id}/diagram-views：提交name、notes（可省略，默认空字符串）、state、snapshot，成功201，返回视图摘要；不会修改时刻表或修订号。
 - GET /api/v1/runs/{run_id}/diagram-views/{view_id}：按run及视图ID读取完整保存状态及快照，不读取当前时刻表重新绘图。
 
-摘要为id、run_id、name、created_at、line_ind、station_count、train_count、highlight_count。state.version=1，包含line_ind、overlay_base、reverse、station_ids、train_keys、highlighted_keys、expanded_station_ids、track_station、viewport（x0/x1/y0/y1）、from_time、to_time、detail_open和chart_height（340—4000px）。
+- DELETE /api/v1/runs/{run_id}/diagram-views/{view_id}：删除单个旧版视图，返回deleted_view_id；不存在或跨run为404，保留时刻表和其他节点。
+- PATCH /api/v1/runs/{run_id}/diagram-views/{view_id}：提交name、notes，仅更新名称和备注，返回更新摘要；不覆盖状态或快照。
+
+摘要为id、run_id、name、notes、created_at、line_ind、station_count、train_count、highlight_count。state.version=1，包含line_ind、overlay_base、reverse、station_ids、train_keys、highlighted_keys、expanded_station_ids、track_station、viewport（x0/x1/y0/y1）、from_time、to_time、detail_open和chart_height（340—4000px）。
 
 snapshot.context与snapshot.data分别采用保存时的PlotContext和PlotData；data.series只保留显示或高亮的系列，系列key包含对象类型、对象及列车身份，以区分同车次的基本图和run。快照与状态以同一事务写入，JSON合计最多32 MB。run/线路、车站、系列及基本图归属必须与快照一致，范围须有限且递增。
 
@@ -283,14 +286,52 @@ snapshot.context与snapshot.data分别采用保存时的PlotContext和PlotData�
 | 方法/路径 | 行为 |
 | --- | --- |
 | GET /api/v1/analysis/nodes | 所有普通run的分析节点摘要，不含快照 |
-| POST /api/v1/runs/{run_id}/analysis-nodes | 创建view、solver-log或delay节点，201 |
+| POST /api/v1/runs/{run_id}/analysis-nodes | 创建view、solver-log、delay或metrics节点，201 |
 | GET /api/v1/runs/{run_id}/analysis-nodes/{node_id} | 读取完整工作区配置与快照 |
+| PATCH /api/v1/runs/{run_id}/analysis-nodes/{node_id} | 仅修改name、notes，返回更新摘要 |
+| DELETE /api/v1/runs/{run_id}/analysis-nodes/{node_id} | 删除单个分析节点，返回deleted_node_id，保留run和日志附件 |
+| DELETE /api/v1/runs/{run_id}/solver-logs/{log_id} | 删除日志附件，返回deleted_log_id；若有保存节点引用则409并列出引用名称 |
 | GET /api/v1/analysis/logs | 日志附件摘要，供分类树直接显示TXT子节点 |
 | GET /api/v1/runs/{run_id}/solver-logs/{log_id}/text?encoding=utf-8 | 严格解码日志文本；另支持gb18030 |
-| GET /api/v1/runs/{run_id}/delay-analysis | 按当前有效基本图计算已保存run的到发延误秒数 |
+| GET /api/v1/runs/{run_id}/delay-analysis | 按当前有效基本图计算已保存run的到发延误秒数，附完整路径始发/终到端点，供单run指标页复用 |
 
-保存请求：node_type（view/solver-log/delay）、name、state。state.version=1，含expanded_sections（diagram/log/delay，可同时或全折叠）、可空diagram（现有CreateDiagramView）、log配置、可空delay（state+snapshot）。主类型view须有可绘图快照，solver-log须有本run日志，delay须有本run延误快照。整个已加载工作区一起保存；未来日志可视化的JSON参数放入log.visualization_state。所有名称去首尾空白，同run/类型重名409；状态或快照非法422，正文合计超32MB为413，不存在run/跨run读取404。保存不更新时刻表。
+保存请求：node_type（view/solver-log/delay/metrics）、name、notes（默认空字符串）、state。摘要和完整节点均返回notes。名称为1至200字符，去首尾空白后不能为空；备注最多20000字符，保留原始换行，允许空字符串。两个PATCH接口只接受name、notes，拒绝state、snapshot、node_type等字段；不更改ID、run、类型、创建时间或历史数据。重名409、非法字段422、未知或跨run的节点404，失败不部分写入。notes列由启动时幂等升级，新旧节点均兼容。state.version=1，含expanded_sections（diagram/log/delay，可同时或全折叠）、可空diagram（现有CreateDiagramView）、log配置、可空delay（state+snapshot）、可空metrics（state+snapshot），以及active_view（workspace/metrics，默认workspace）。主类型view须有可绘图快照，solver-log须有本run日志，delay须有本run的延误预览快照，metrics须有本run的指标快照；保存metrics类型时active_view统一记为metrics，回看直接进入指标页。整个已加载工作区一起保存；日志可视化的JSON参数放入log.visualization_state。所有名称去首尾空白，同run/类型重名409；状态或快照非法422，正文合计超32MB为413，不存在run/跨run读取404。保存不更新时刻表。分析节点和旧视图的DELETE按run、ID和存储类型隔离，只删除所选记录；不存在或跨run为404，重复删除为404。日志DELETE在同一事务内检查所有类型的分析节点的state.log.log_id引用，存在引用时不修改任何记录；先删保存节点、再删附件。实验沿用既有带revision和confirmed的DELETE接口，同步删除成员关系，保留所有run。
 
-日志文本返回id/filename/digest/encoding/text，原始文件仍由download接口提供。无法按指定编码解码422，支持UTF-8 BOM和GB18030/GBK。延误返回object/base/revision/stations/trains/rows/cells/issues/method，cells到发值为带正负的秒数或null，并附逐字段reason；缺失值不按0计。具体口径见[统一分析指南](run_analysis_guide.md)。旧diagram-views API保留兼容。
+旧delay类型且仅含指标的已保存节点继续兼容读取，另存指标使用metrics类型；新建delay不能仅以指标快照替代预览快照。
+
+metrics.state包含selected（十种登记指标中选2至6项，不重复，terminal_affected为终到超阈值列车数，affected保持沿途口径）、event（arrival/departure）、unit（seconds/minutes）、threshold_seconds（0至86400的有限数，默认0）、scope（all/selected）、station_ids、train_ids、active_train_id、row_offset、train_offset。include_zero_arrivals默认true；false时仅到达均值的分母改为到达偏差>0的事件数，与晚点阈值无关，其他指标不变。curve_train_ids为绘图多选列车ID，最多20000项且不重复；省略或null表示按旧active_train_id恢复，空数组表示明确不选列车。curve_fields为arrival/departure的不重复子集，默认两者，允许空数组。curve_camera保存azimuth（-180至180，默认-40）、elevation（10至80，默认28）、zoom（0.6至2.5，默认1），均为有限数。车站、统计列车、高亮列车及绘图列车须属于同run快照。metrics.snapshot使用延误API的完整输入；P95采用最近秩，提前不抵消晚点，阈值判定严格大于。缺失样本不补零，终到只使用真实匹配的末次访问，不能将筛选末行改作终到。详见[指标分析指南](performance_metrics_guide.md)。
+
+metrics.state.include_zero_departures默认true，独立于include_zero_arrivals持久化。false时仅出发均值的分母改为出发偏差>0的有效事件数，与晚点阈值无关；无正晚点样本时均值为不可计算。旧状态缺省按true恢复。
+
+metrics.state.curve_mode为2d/3d，默认2d。单选、多选列车均按明确设置绘制；旧状态缺省时默认2D。显示方式随快照持久化，不随列车数量自动切换。2D按列车颜色叠加曲线，多车共用车站轴与延误刻度；到达为实线、出发为虚线。
+
+metrics.state.curve_station_ids为偏差曲线的绘图车站ID，最多10000项且不重复，须属于同一run快照；省略或null表示旧状态按全部车站恢复，空数组表示明确不选车站。该字段同时控制二维、三维图，不改变统计车站范围或曲线列车均值排序。
+
+时空热力图配置位于metrics.state.time_heatmap：interval_minutes仅允许1/10/60，默认10；fields为arrival/departure的不重复子集，默认两者，允许空数组。配置随分析节点持久化，旧指标状态缺省时采用默认值。
+
+日志文本返回id/filename/digest/encoding/text，原始文件仍由download接口提供。无法按指定编码解码422，支持UTF-8 BOM和GB18030/GBK。延误返回object/base/revision/stations/trains/rows/cells/endpoints/issues/method，cells到发值为带正负的秒数或null，并附逐字段reason；缺失值不按0计。cells新增arrival_time/departure_time，为run实际到发的完整ISO日历时刻（不附时区，不执行浏览器本地时区换算）；无实际时刻时为null，未能匹配图定时刻时仍可保留实际时刻但相应偏差为null。时空图按实际时刻分格，旧快照缺失这些字段时提示明确重新计算。endpoints每列车包含origin_row_key、terminal_row_key、origin_departure、terminal_arrival和端点reason；未匹配完整边界、SEQ歧义或缺时刻保留null。旧快照可没有endpoints，不补算其终到指标。计算取得一致快照后释放数据库锁。具体口径见[统一分析指南](run_analysis_guide.md)。旧diagram-views API保留兼容。
 
 运行图series补充可空run_no：普通run为所属方案的数字编号，基本图为null，用于前端绘图列车选项的同车次方案排序。旧绘图快照继续兼容，前端可从同一对象的snapshot.data.object.run_no补足。
+
+## run基本信息与可继承小节备注（2026-10-30）
+
+| 方法/路径 | 行为 |
+| --- | --- |
+| GET /api/v1/runs/{run_id}/metadata | 轻量读取id、batch_id、name、run_no、notes和analysis_notes，不读取时刻表 |
+| PATCH /api/v1/runs/{run_id}/metadata | 修改name和/或notes，至少一项且不能为null；返回run基本信息 |
+| PATCH /api/v1/runs/{run_id}/analysis-notes | 提交section和notes字符串，只修改run对应小节备注 |
+| PATCH /api/v1/runs/{run_id}/analysis-nodes/{node_id}/section-notes | 提交section、notes字符串或null，只修改保存节点的对应小节覆盖 |
+| PATCH /api/v1/runs/{run_id}/diagram-views/{view_id}/section-notes | 旧版视图的小节覆盖，语义同上 |
+| PATCH /api/v1/runs/{run_id}/solver-logs/{log_id}/section-notes | 导入日志附件的小节覆盖，保留正文及识别信息 |
+
+section只允许diagram、log、delay。每项备注最多20000字符；run父级备注默认为空字符串，子节点缺省或null表示继承run对应小节，空字符串表示明确覆盖为空白。继承在前端按当前父级解析，不写入历史快照。分析节点、旧视图和日志摘要/详情返回section_notes；POST保存分析节点及旧视图也接受section_notes，用于另存已有覆盖。总备注notes与小节备注独立，原元数据PATCH只修改名称和总备注，不清空小节覆盖。
+
+run名称为1至200字符，去首尾空白，所属批次及run_no相同的重名返回409；无run、旧基本图或跨run修改不存在对象返回404。未知小节、超过长度、字段非法为422。每次小节更新在事务内合并单个字段，保留其余备注。基本信息和备注更新不修改时刻表工作修订或事件数据；编辑器修订散列排除显示性的run名称、总备注、小节备注和上下文中的run名称，使运行期间改名和备注编辑不使已校验草稿失效。
+
+## 求解日志目标值、时间与来源
+
+GET /api/v1/runs/{run_id}/solver-logs/{log_id}轻量读取日志元数据，不读取正文。PATCH同一路径提交best_objective和/或solve_seconds，至少一项，允许null；best_objective须为有限数值，solve_seconds须为非负有限数值。未提交的字段及其来源保持原样，提交的字段来源设为manual。来源字段由服务器管理，不能通过请求直接设置；非法数值或未知字段为422，未知或跨run对象为404。
+
+日志摘要/详情新增best_objective、solve_seconds、objective_source、time_source、result_extraction和result_warnings。来源枚举为solver-log、manual、unavailable，前端显示为求解日志、人工填写、未获取。result_extraction保存编码及原文件证据行号，result_warnings按当前字段状态生成。手工修改不影响原始BLOB、digest、分类、备注及已有分析快照。
+
+POST导入在事务外按识别编码解析明确结果行，再与附件一起写入。无法提取时仍成功导入并返回提示；重复导入保留原附件和人工字段，旧附件缺少提取记录时仅补充自动字段。启动幂等升级run_solver_logs新增列，不回写原附件内容。

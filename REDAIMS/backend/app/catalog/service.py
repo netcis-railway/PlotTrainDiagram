@@ -364,11 +364,17 @@ class CatalogService:
     def ungrouped_runs(self):
         with self.database.transaction() as connection:
             rows = connection.execute(
-                "SELECT id, name, run_no, origin_path FROM runs WHERE batch_id IS "
+                "SELECT id, name, run_no, origin_path,notes FROM runs WHERE batch_id IS "
                 "NULL AND id NOT IN (SELECT run_id FROM base_run_data WHERE "
                 "role='base') ORDER BY id"
             ).fetchall()
         return [
-            {"id": row[0], "name": row[1], "run_no": row[2], "origin_path": json.loads(row[3])}
+            {
+                "id": row[0],
+                "name": row[1],
+                "run_no": row[2],
+                "origin_path": json.loads(row[3]),
+                "notes": row[4] or "",
+            }
             for row in rows
         ]

@@ -6,12 +6,13 @@ from uuid import uuid4
 
 import duckdb
 from app.api.v1.diagram_views import CreateDiagramView, Viewport, validate_snapshot
+from app.api.v1.run_metadata import SectionNotes, SectionNoteUpdate
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
 
 MAX_ANALYSIS_BYTES = 32 * 1024 * 1024
 Section = Literal["diagram", "log", "delay"]
-NodeType = Literal["view", "solver-log", "delay"]
+NodeType = Literal["view", "solver-log", "delay", "metrics"]
 
 
 class LogDisplay(BaseModel):
@@ -48,6 +49,72 @@ class DelaySection(BaseModel):
     snapshot: dict[str, JsonValue]
 
 
+Metric = Literal[
+    "total",
+    "mean",
+    "max",
+    "p95",
+    "late_rate",
+    "affected",
+    "terminal_total",
+    "terminal_mean",
+    "terminal_rate",
+    "terminal_affected",
+]
+
+
+class MetricCamera(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    azimuth: float = Field(default=-40, ge=-180, le=180, allow_inf_nan=False)
+    elevation: float = Field(default=28, ge=10, le=80, allow_inf_nan=False)
+    zoom: float = Field(default=1, ge=0.6, le=2.5, allow_inf_nan=False)
+
+
+class MetricTimeHeatmap(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    interval_minutes: Literal[1, 10, 60] = 10
+    fields: list[Literal["arrival", "departure"]] = Field(
+        default_factory=lambda: ["arrival", "departure"], max_length=2
+    )
+
+    @field_validator("fields")
+    @classmethod
+    def unique_fields(cls, value):
+        if len(set(value)) != len(value):
+            raise ValueError("时空热力图事件不能重复")
+        return value
+
+
+class MetricDisplay(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    selected: list[Metric] = Field(min_length=2, max_length=6)
+    event: Literal["arrival", "departure"] = "arrival"
+    include_zero_arrivals: bool = True
+    include_zero_departures: bool = True
+    curve_train_ids: list[str] | None = Field(default=None, max_length=20000)
+    curve_station_ids: list[str] | None = Field(default=None, max_length=10000)
+    curve_mode: Literal["2d", "3d"] = "2d"
+    curve_fields: list[Literal["arrival", "departure"]] = Field(
+        default_factory=lambda: ["arrival", "departure"], max_length=2
+    )
+    curve_camera: MetricCamera = Field(default_factory=MetricCamera)
+    time_heatmap: MetricTimeHeatmap = Field(default_factory=MetricTimeHeatmap)
+    unit: Literal["seconds", "minutes"] = "minutes"
+    threshold_seconds: float = Field(default=0, ge=0, le=86400, allow_inf_nan=False)
+    scope: Literal["all", "selected"] = "all"
+    station_ids: list[str] = Field(default_factory=list, max_length=10000)
+    train_ids: list[str] = Field(default_factory=list, max_length=20000)
+    active_train_id: str = ""
+    row_offset: int = Field(default=0, ge=0)
+    train_offset: int = Field(default=0, ge=0)
+
+
+class MetricSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    state: MetricDisplay
+    snapshot: dict[str, JsonValue]
+
+
 class AnalysisState(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version: Literal[1] = 1
@@ -55,13 +122,14 @@ class AnalysisState(BaseModel):
     diagram: CreateDiagramView | None = None
     log: LogDisplay = Field(default_factory=LogDisplay)
     delay: DelaySection | None = None
+    metrics: MetricSection | None = None
+    active_view: Literal["workspace", "metrics"] = "workspace"
 
 
-class CreateAnalysisNode(BaseModel):
+class AnalysisMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    node_type: NodeType
     name: str = Field(min_length=1, max_length=200)
-    state: AnalysisState
+    notes: str = Field(default="", max_length=20000)
 
     @field_validator("name")
     @classmethod
@@ -71,12 +139,20 @@ class CreateAnalysisNode(BaseModel):
         return value.strip()
 
 
+class CreateAnalysisNode(AnalysisMetadata):
+    node_type: NodeType
+    state: AnalysisState
+    section_notes: SectionNotes = Field(default_factory=dict)
+
+
 class AnalysisNodeSummary(BaseModel):
     id: str
     run_id: str
     node_type: NodeType
     name: str
     created_at: str
+    notes: str = ""
+    section_notes: SectionNotes = Field(default_factory=dict)
 
 
 class SavedAnalysisNode(AnalysisNodeSummary):
@@ -97,8 +173,8 @@ def router(database):
     def summary(row):
         return dict(
             zip(
-                ("id", "run_id", "node_type", "name", "created_at"),
-                (*row[:4], row[4].isoformat()),
+                ("id", "run_id", "node_type", "name", "created_at", "notes", "section_notes"),
+                (*row[:4], row[4].isoformat(), row[5] or "", json.loads(row[6] or "{}")),
                 strict=True,
             )
         )
@@ -109,7 +185,7 @@ def router(database):
             return [
                 summary(row)
                 for row in c.execute(
-                    "SELECT v.id,v.run_id,v.node_type,v.name,v.created_at "
+                    "SELECT v.id,v.run_id,v.node_type,v.name,v.created_at,v.notes,v.section_notes "
                     "FROM run_analysis_nodes v "
                     "JOIN runs r ON r.id=v.run_id WHERE r.id NOT IN "
                     "(SELECT run_id FROM base_run_data WHERE role='base') "
@@ -128,7 +204,11 @@ def router(database):
             if payload.node_type == "solver-log" and not state.log.log_id:
                 raise ValueError("请先选择求解日志")
             if payload.node_type == "delay" and not state.delay:
-                raise ValueError("请先展开延误分析并读取数据")
+                raise ValueError("请先展开延误预览并读取数据")
+            if payload.node_type == "metrics":
+                if not state.metrics:
+                    raise ValueError("请先进入指标分析并读取数据")
+                state.active_view = "metrics"
             if state.delay:
                 delay = state.delay
                 snapshot = delay.snapshot
@@ -145,6 +225,40 @@ def router(database):
                 for field in ("train_ids", "highlighted_ids"):
                     if not set(getattr(delay.state, field)) <= trains:
                         raise ValueError("延误分析包含未知列车")
+            if state.metrics:
+                metric = state.metrics
+                snapshot = metric.snapshot
+                if snapshot["object"]["id"] != run_id or not snapshot.get("base"):
+                    raise ValueError("指标快照与当前run不一致或缺少基本图")
+                stations = {s["id"] for s in snapshot["stations"]}
+                trains = {t["id"] for t in snapshot["trains"]}
+                if not isinstance(snapshot["cells"], list) or not isinstance(
+                    snapshot["rows"], list
+                ):
+                    raise ValueError("指标数据快照格式无效")
+                if (
+                    not set(metric.state.station_ids) <= stations
+                    or not set(metric.state.train_ids) <= trains
+                ):
+                    raise ValueError("指标分析包含未知车站或列车")
+                if metric.state.active_train_id and metric.state.active_train_id not in trains:
+                    raise ValueError("指标分析包含未知高亮列车")
+                if metric.state.curve_train_ids is not None:
+                    if not set(metric.state.curve_train_ids) <= trains:
+                        raise ValueError("偏差曲线包含未知列车")
+                    if len(set(metric.state.curve_train_ids)) != len(metric.state.curve_train_ids):
+                        raise ValueError("偏差曲线列车不能重复")
+                if metric.state.curve_station_ids is not None:
+                    if not set(metric.state.curve_station_ids) <= stations:
+                        raise ValueError("偏差曲线包含未知车站")
+                    if len(set(metric.state.curve_station_ids)) != len(
+                        metric.state.curve_station_ids
+                    ):
+                        raise ValueError("偏差曲线车站不能重复")
+                if len(set(metric.state.curve_fields)) != len(metric.state.curve_fields):
+                    raise ValueError("偏差曲线观测事件不能重复")
+                if len(set(metric.state.selected)) != len(metric.state.selected):
+                    raise ValueError("指标不能重复选择")
             encoded = json.dumps(state.model_dump(), ensure_ascii=False, allow_nan=False)
         except (ValueError, KeyError, TypeError) as error:
             raise HTTPException(422, str(error)) from error
@@ -162,9 +276,19 @@ def router(database):
                 ):
                     raise HTTPException(422, "求解日志不属于当前run")
                 row = c.execute(
-                    "INSERT INTO run_analysis_nodes (id,run_id,node_type,name,state) "
-                    "VALUES (?,?,?,?,?) RETURNING id,run_id,node_type,name,created_at",
-                    [str(uuid4()), run_id, payload.node_type, payload.name, encoded],
+                    "INSERT INTO run_analysis_nodes "
+                    "(id,run_id,node_type,name,state,notes,section_notes) "
+                    "VALUES (?,?,?,?,?,?,?) RETURNING "
+                    "id,run_id,node_type,name,created_at,notes,section_notes",
+                    [
+                        str(uuid4()),
+                        run_id,
+                        payload.node_type,
+                        payload.name,
+                        encoded,
+                        payload.notes,
+                        json.dumps(payload.section_notes, ensure_ascii=False),
+                    ],
                 ).fetchone()
                 return summary(row)
         except duckdb.ConstraintException as error:
@@ -175,13 +299,62 @@ def router(database):
         with database.transaction() as c:
             check_run(c, run_id)
             row = c.execute(
-                "SELECT id,run_id,node_type,name,created_at,state FROM run_analysis_nodes "
+                "SELECT id,run_id,node_type,name,created_at,notes,section_notes,state FROM "
+                "run_analysis_nodes "
                 "WHERE run_id=? AND id=?",
                 [run_id, node_id],
             ).fetchone()
             if not row:
                 raise HTTPException(404, "分析节点不存在")
-            return summary(row) | {"state": json.loads(row[5])}
+            return summary(row) | {"state": json.loads(row[7])}
+
+    @api.patch("/runs/{run_id}/analysis-nodes/{node_id}", response_model=AnalysisNodeSummary)
+    def update_node(run_id: str, node_id: str, payload: AnalysisMetadata):
+        try:
+            with database.transaction() as c:
+                check_run(c, run_id)
+                row = c.execute(
+                    "UPDATE run_analysis_nodes SET name=?,notes=? WHERE run_id=? AND id=? "
+                    "RETURNING id,run_id,node_type,name,created_at,notes,section_notes",
+                    [payload.name, payload.notes, run_id, node_id],
+                ).fetchone()
+                if not row:
+                    raise HTTPException(404, "分析节点不存在")
+                return summary(row)
+        except duckdb.ConstraintException as error:
+            raise HTTPException(409, "该run下已有同类型同名节点，请使用其他名称") from error
+
+    @api.patch(
+        "/runs/{run_id}/analysis-nodes/{node_id}/section-notes", response_model=AnalysisNodeSummary
+    )
+    def update_section_notes(run_id: str, node_id: str, payload: SectionNoteUpdate):
+        with database.transaction() as c:
+            check_run(c, run_id)
+            current = c.execute(
+                "SELECT section_notes FROM run_analysis_nodes WHERE run_id=? AND id=?",
+                [run_id, node_id],
+            ).fetchone()
+            if not current:
+                raise HTTPException(404, "分析节点不存在")
+            notes = json.loads(current[0] or "{}") | {payload.section: payload.notes}
+            row = c.execute(
+                "UPDATE run_analysis_nodes SET section_notes=? WHERE run_id=? AND id=? "
+                "RETURNING id,run_id,node_type,name,created_at,notes,section_notes",
+                [json.dumps(notes, ensure_ascii=False), run_id, node_id],
+            ).fetchone()
+            return summary(row)
+
+    @api.delete("/runs/{run_id}/analysis-nodes/{node_id}")
+    def delete_node(run_id: str, node_id: str):
+        with database.transaction() as c:
+            check_run(c, run_id)
+            row = c.execute(
+                "DELETE FROM run_analysis_nodes WHERE run_id=? AND id=? RETURNING id",
+                [run_id, node_id],
+            ).fetchone()
+            if not row:
+                raise HTTPException(404, "分析节点不存在")
+            return {"deleted_node_id": row[0]}
 
     @api.get("/analysis/logs")
     def all_logs():

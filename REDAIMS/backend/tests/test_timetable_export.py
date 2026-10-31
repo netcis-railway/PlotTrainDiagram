@@ -100,6 +100,12 @@ def test_date_only_save_updates_all_dates_atomically(context, kind):
     sheet = book[options["sheets"][0]["name"]]
     values = [cell.value for row in sheet for cell in row if isinstance(cell.value, datetime)]
     assert min(d.date() for d in values).isoformat() == "2025-06-01"
+    for header in sheet[1]:
+        if isinstance(header.value, str) and header.value.endswith(("_A", "_D")):
+            assert all(
+                row[0].number_format == "hh:mm:ss"
+                for row in sheet.iter_rows(min_row=2, min_col=header.column, max_col=header.column)
+            )
     book.close()
 
 
@@ -131,6 +137,14 @@ def test_date_and_cross_day_edit_token_and_invalid_dates(context):
     saved = next(e for e in response.json()["events"] if e["id"] == event["id"])
     assert saved["departure_datetime"] == "2025-06-02T01:10:00"
     assert saved["departure"]["seconds"] == 90600
+    _, exported_file = exported(client, url, ["TTT"])
+    assert exported_file.status_code == 200, exported_file.text
+    exported_book = load_workbook(BytesIO(exported_file.content))
+    source = event["source"]
+    exported_cell = exported_book[source["sheet"]].cell(source["row"], source["first_column"] + 1)
+    assert exported_cell.value == datetime(2025, 6, 2, 1, 10)
+    assert exported_cell.number_format == "hh:mm:ss"
+    exported_book.close()
     after = client.get(url + "/tables").json()
     assert (
         client.post(
@@ -160,14 +174,16 @@ def test_date_and_cross_day_edit_token_and_invalid_dates(context):
     assert client.get(url + "/tables").json() == after
 
 
-def test_defaults_four_tables_and_result_only_and_roundtrip(context):
+def test_defaults_four_tables_preserve_entire_workbook_and_roundtrip(context):
     _, client, _, base, sample = context
     base_url = f"/api/v1/base-timetables/{base['id']}"
     options, response = exported(client, base_url)
     assert response.status_code == 200, response.text
     assert "filename*=UTF-8''" in response.headers["content-disposition"]
     book = load_workbook(BytesIO(response.content))
-    assert set(book.sheetnames) == {"TTT1base", "LINE_INFO", "NODE_INFO", "MINIMUM_RUN_TIME"}
+    original = load_workbook(BytesIO(sample))
+    assert book.sheetnames == original.sheetnames
+    original.close()
     book.close()
     report = parse_base(
         response.content, datetime(2025, 5, 25).date(), "preserve", track_lists=True
@@ -175,13 +191,14 @@ def test_defaults_four_tables_and_result_only_and_roundtrip(context):
     assert not [i for i in report["issues"] if i["severity"] == "error"]
     assert len(report["events"]) == 148 and len(report["nodes"]) == 53
     options, result = exported(client, "/api/v1/runs/result")
-    assert options["defaults"] == ["TTT"] and result.status_code == 200, result.text
+    assert options["defaults"] == ["TTT", "LINE_INFO", "NODE_INFO", "MINIMUM_RUN_TIME"]
+    assert result.status_code == 200, result.text
     book = load_workbook(BytesIO(result.content))
-    assert book.sheetnames == ["TTT1base"]
+    assert book.sheetnames == ["TTT1base", "LINE_INFO", "NODE_INFO", "MINIMUM_RUN_TIME"]
     book.close()
     _, result = exported(client, "/api/v1/runs/result", ["TTT", "NODE_INFO"])
     book = load_workbook(BytesIO(result.content))
-    assert book.sheetnames == ["TTT1base", "NODE_INFO"]
+    assert book.sheetnames == ["TTT1base", "LINE_INFO", "NODE_INFO", "MINIMUM_RUN_TIME"]
     book.close()
     assert Path(base["source_files"][0]["managed_path"]).read_bytes() == sample
 
@@ -216,6 +233,14 @@ def test_overwrite_only_selected_parts_and_keep_epoch(context, epoch1904):
     assert merged["用户备注"].column_dimensions["A"].width == 37
     dates = [c.value for row in merged["TTT1base"] for c in row if isinstance(c.value, datetime)]
     assert min(t.date() for t in dates).isoformat() == "2025-06-01"
+    for header in merged["TTT1base"][1]:
+        if isinstance(header.value, str) and header.value.endswith(("_A", "_D")):
+            assert all(
+                row[0].number_format == "hh:mm:ss"
+                for row in merged["TTT1base"].iter_rows(
+                    min_row=2, min_col=header.column, max_col=header.column
+                )
+            )
     if epoch1904:
         assert merged.epoch == CALENDAR_MAC_1904
     merged.close()

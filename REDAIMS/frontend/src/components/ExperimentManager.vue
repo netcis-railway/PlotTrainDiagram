@@ -116,7 +116,7 @@ async function openAnalysis() {
       </fieldset>
     </form>
     <template v-if="detail && !loading">
-      <div class="catalog-actions"><button type="button" :disabled="busy || analysisOpening || detail.status !== 'ready'" :title="detail.status === 'ready' ? '打开实验成员运行图、求解日志和延误分析' : '请先加入使用同一基本图和基准日的成员run'" @click="openAnalysis">{{ analysisOpening ? '正在打开…' : '实验数据分析' }}</button></div>
+      <div class="catalog-actions"><button type="button" :disabled="busy || analysisOpening || detail.status !== 'ready'" :title="detail.status === 'ready' ? '打开实验成员运行图、求解日志和延误预览' : '请先加入使用同一基本图和基准日的成员run'" @click="openAnalysis">{{ analysisOpening ? '正在打开…' : '实验数据分析' }}</button></div>
       <p><strong>实体完整路径：</strong>{{ formatPath(detail.classification_path) }} → 实验：{{ detail.name }}</p>
       <p><strong>成员状态：</strong>{{ ({empty:'暂无成员',ready:'基本图和基准日一致',invalid:'成员不可比较'})[detail.status] }} · {{ detail.member_count }} 个run</p>
       <p v-if="detail.base_tt_id">共同基本图：{{ detail.members[0]?.effective_base.baseTT_no }} · 基准日：{{ detail.date_base }}</p>

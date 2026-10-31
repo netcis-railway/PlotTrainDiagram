@@ -4,6 +4,7 @@ import { analysisApi, defaultLogDisplay, type LogDisplay, type SolverLogSummary,
 import { solverLogVisualizer } from '../solverLogVisualization'
 import SolverLogImport from './SolverLogImport.vue'
 import SolverProgressPlot from './SolverProgressPlot.vue'
+import SolverLogResults from './SolverLogResults.vue'
 const props = defineProps<{ runId: string; initial?: LogDisplay }>()
 const emit = defineEmits<{ imported: [] }>()
 const state = ref<LogDisplay>(JSON.parse(JSON.stringify(props.initial || defaultLogDisplay())))
@@ -74,6 +75,7 @@ onUnmounted(() => { closed = true; generation++ })
   <div v-if="filename" class="analysis-controls"><label>求解器类型<select :value="solverType" :disabled="busy || classifying" @change="classify(($event.target as HTMLSelectElement).value)"><option value="unknown">未识别</option><option v-for="solver in config.solvers" :key="solver.id" :value="solver.id">{{ solver.label }}</option></select></label><button type="button" :disabled="busy || classifying" @click="classify()">按当前规则重新识别</button><span v-if="classifying" role="status">正在识别…</span></div>
   <p v-if="configError" class="error" role="alert">{{ configError }}</p>
   <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="busy" role="status">正在读取日志…</p>
+  <SolverLogResults v-if="state.log_id" :key="runId + ':' + state.log_id" :run-id="runId" :log-id="state.log_id" @saved="afterImport" />
   <template v-if="filename"><p>{{ filename }} · {{ filtered.length }} / {{ lines.length }}行</p>
     <div ref="viewer" class="analysis-log-text" :class="{ wrap: state.wrap }" tabindex="0" aria-label="求解日志文本">
       <div v-for="line in filtered" :key="line.number"><span class="log-line-number">{{ line.number }}</span><span>{{ line.text || ' ' }}</span></div>

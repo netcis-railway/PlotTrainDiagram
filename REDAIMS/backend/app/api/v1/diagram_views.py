@@ -5,6 +5,7 @@ from typing import Literal
 from uuid import uuid4
 
 import duckdb
+from app.api.v1.run_metadata import SectionNotes, SectionNoteUpdate
 from fastapi import APIRouter, HTTPException
 from pydantic import (
     BaseModel,
@@ -75,11 +76,10 @@ class PlotSnapshot(BaseModel):
     data: dict[str, JsonValue]
 
 
-class CreateDiagramView(BaseModel):
+class DiagramViewMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1, max_length=200)
-    state: ViewState
-    snapshot: PlotSnapshot
+    notes: str = Field(default="", max_length=20000)
 
     @field_validator("name")
     @classmethod
@@ -88,6 +88,12 @@ class CreateDiagramView(BaseModel):
         if not value:
             raise ValueError("请输入视图名称")
         return value
+
+
+class CreateDiagramView(DiagramViewMetadata):
+    state: ViewState
+    snapshot: PlotSnapshot
+    section_notes: SectionNotes = Field(default_factory=dict)
 
 
 class DiagramViewSummary(BaseModel):
@@ -99,6 +105,8 @@ class DiagramViewSummary(BaseModel):
     station_count: int
     train_count: int
     highlight_count: int
+    notes: str = ""
+    section_notes: SectionNotes = Field(default_factory=dict)
 
 
 class SavedDiagramView(DiagramViewSummary):
@@ -163,6 +171,8 @@ def router(database):
             "run_id": row[1],
             "name": row[2],
             "created_at": row[3].isoformat(),
+            "notes": row[5] or "",
+            "section_notes": json.loads(row[6] or "{}"),
             "line_ind": state["line_ind"],
             "station_count": len(state["station_ids"]),
             "train_count": len(state["train_keys"]),
@@ -175,7 +185,8 @@ def router(database):
             return [
                 summary(row)
                 for row in connection.execute(
-                    "SELECT v.id,v.run_id,v.name,v.created_at,v.state FROM run_diagram_views v "
+                    "SELECT v.id,v.run_id,v.name,v.created_at,v.state,v.notes,v.section_notes "
+                    "FROM run_diagram_views v "
                     "JOIN runs r ON r.id=v.run_id WHERE r.id NOT IN "
                     "(SELECT run_id FROM base_run_data WHERE role='base') "
                     "ORDER BY v.created_at,v.id"
@@ -189,7 +200,8 @@ def router(database):
             return [
                 summary(row)
                 for row in connection.execute(
-                    "SELECT id,run_id,name,created_at,state FROM run_diagram_views "
+                    "SELECT id,run_id,name,created_at,state,notes,section_notes FROM "
+                    "run_diagram_views "
                     "WHERE run_id=? ORDER BY created_at,id",
                     [run_id],
                 ).fetchall()
@@ -211,9 +223,19 @@ def router(database):
             with database.transaction() as connection:
                 check_run(connection, run_id)
                 row = connection.execute(
-                    "INSERT INTO run_diagram_views (id,run_id,name,state,snapshot) "
-                    "VALUES (?,?,?,?,?) RETURNING id,run_id,name,created_at,state",
-                    [str(uuid4()), run_id, payload.name, state, snapshot],
+                    "INSERT INTO run_diagram_views "
+                    "(id,run_id,name,state,snapshot,notes,section_notes) "
+                    "VALUES (?,?,?,?,?,?,?) RETURNING "
+                    "id,run_id,name,created_at,state,notes,section_notes",
+                    [
+                        str(uuid4()),
+                        run_id,
+                        payload.name,
+                        state,
+                        snapshot,
+                        payload.notes,
+                        json.dumps(payload.section_notes, ensure_ascii=False),
+                    ],
                 ).fetchone()
                 return summary(row)
         except duckdb.ConstraintException as error:
@@ -224,12 +246,61 @@ def router(database):
         with database.transaction() as connection:
             check_run(connection, run_id)
             row = connection.execute(
-                "SELECT id,run_id,name,created_at,state,snapshot FROM run_diagram_views "
+                "SELECT id,run_id,name,created_at,state,notes,section_notes,snapshot FROM "
+                "run_diagram_views "
                 "WHERE run_id=? AND id=?",
                 [run_id, view_id],
             ).fetchone()
             if not row:
                 raise HTTPException(404, "保存的运行图视图不存在")
-            return summary(row) | {"state": json.loads(row[4]), "snapshot": json.loads(row[5])}
+            return summary(row) | {"state": json.loads(row[4]), "snapshot": json.loads(row[7])}
+
+    @api.patch("/runs/{run_id}/diagram-views/{view_id}", response_model=DiagramViewSummary)
+    def update_view(run_id: str, view_id: str, payload: DiagramViewMetadata):
+        try:
+            with database.transaction() as connection:
+                check_run(connection, run_id)
+                row = connection.execute(
+                    "UPDATE run_diagram_views SET name=?,notes=? WHERE run_id=? AND id=? "
+                    "RETURNING id,run_id,name,created_at,state,notes,section_notes",
+                    [payload.name, payload.notes, run_id, view_id],
+                ).fetchone()
+                if not row:
+                    raise HTTPException(404, "保存的运行图视图不存在")
+                return summary(row)
+        except duckdb.ConstraintException as error:
+            raise HTTPException(409, "此run下已有同名视图，请使用其他名称") from error
+
+    @api.patch(
+        "/runs/{run_id}/diagram-views/{view_id}/section-notes", response_model=DiagramViewSummary
+    )
+    def update_section_notes(run_id: str, view_id: str, payload: SectionNoteUpdate):
+        with database.transaction() as c:
+            check_run(c, run_id)
+            current = c.execute(
+                "SELECT section_notes FROM run_diagram_views WHERE run_id=? AND id=?",
+                [run_id, view_id],
+            ).fetchone()
+            if not current:
+                raise HTTPException(404, "保存的运行图视图不存在")
+            notes = json.loads(current[0] or "{}") | {payload.section: payload.notes}
+            row = c.execute(
+                "UPDATE run_diagram_views SET section_notes=? WHERE run_id=? AND id=? "
+                "RETURNING id,run_id,name,created_at,state,notes,section_notes",
+                [json.dumps(notes, ensure_ascii=False), run_id, view_id],
+            ).fetchone()
+            return summary(row)
+
+    @api.delete("/runs/{run_id}/diagram-views/{view_id}")
+    def delete_view(run_id: str, view_id: str):
+        with database.transaction() as connection:
+            check_run(connection, run_id)
+            row = connection.execute(
+                "DELETE FROM run_diagram_views WHERE run_id=? AND id=? RETURNING id",
+                [run_id, view_id],
+            ).fetchone()
+            if not row:
+                raise HTTPException(404, "保存的运行图视图不存在")
+            return {"deleted_view_id": row[0]}
 
     return api

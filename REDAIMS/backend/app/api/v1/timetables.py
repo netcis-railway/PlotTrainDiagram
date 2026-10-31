@@ -355,9 +355,10 @@ def router(service, settings):
     def runs():
         with service.database.transaction() as c:
             return [
-                dict(zip(("id", "batch_id", "name", "run_no"), r, strict=True))
+                dict(zip(("id", "batch_id", "name", "run_no", "notes"), r, strict=True))
                 for r in c.execute(
-                    "SELECT id,batch_id,name,run_no FROM runs WHERE id NOT IN (SELECT "
+                    "SELECT id,batch_id,name,run_no,coalesce(notes,'') FROM runs "
+                    "WHERE id NOT IN (SELECT "
                     "run_id FROM base_run_data WHERE role='base') ORDER BY name,id"
                 ).fetchall()
             ]

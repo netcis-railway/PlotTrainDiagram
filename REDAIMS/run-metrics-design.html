@@ -1,0 +1,410 @@
+<div id="run-metrics-design">
+<style>
+#run-metrics-design .rm-app {
+ --rm-bg:light-dark(#f2f5f9,#111b2a);--rm-paper:light-dark(#fff,#1b2739);
+ --rm-soft:light-dark(#f5f7fa,#243248);--rm-text:light-dark(#25334a,#e9eef7);
+ --rm-muted:light-dark(#596a80,#afbdd1);--rm-border:light-dark(#dce3ec,#3a4a61);
+ --rm-brand:light-dark(#175ba5,#1c4a7e);--rm-onbrand:light-dark(#fff,#f4f8ff);
+ --rm-blue:light-dark(#2879c6,#78b8f2);--rm-red:light-dark(#bd442f,#f29a80);
+ --rm-green:light-dark(#167462,#7cd1b5);
+ min-height:900px;background:var(--rm-bg);color:var(--rm-text);border-radius:9px;overflow:clip;
+ position:relative;font:14px/1.5 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+}
+#run-metrics-design .rm-app *{box-sizing:border-box}
+#run-metrics-design .rm-app [hidden]{display:none!important}
+#run-metrics-design .rm-top{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--rm-brand);color:var(--rm-onbrand);padding:12px 105px 12px 20px}
+#run-metrics-design .rm-logo{font-weight:500;letter-spacing:.06em}
+#run-metrics-design .rm-demo{font-size:12px}
+#run-metrics-design .rm-nav{display:flex;gap:24px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--rm-border);background:var(--rm-paper);color:var(--rm-muted)}
+#run-metrics-design .rm-nav .rm-active{color:var(--rm-text);font-weight:500;border-bottom:2px solid var(--rm-blue);padding-bottom:3px}
+#run-metrics-design .rm-main{padding:18px 20px 24px}
+#run-metrics-design .rm-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+#run-metrics-design .rm-title{font-size:18px;font-weight:500;margin:0 0 4px}
+#run-metrics-design .rm-sub{font-size:12px;color:var(--rm-muted)}
+#run-metrics-design .rm-tools{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+#run-metrics-design .rm-field{display:flex;flex-direction:column;gap:4px;font-size:12px}
+#run-metrics-design .rm-app select,#run-metrics-design .rm-app input[type=number]{background:var(--rm-paper);color:var(--rm-text);border:1px solid var(--rm-border);border-radius:5px;padding:6px 8px;font:inherit;min-height:34px;max-width:100%}
+#run-metrics-design .rm-field select,#run-metrics-design .rm-field input{font-size:14px}
+#run-metrics-design .rm-app input[type=number]{width:76px}
+#run-metrics-design .rm-button{background:var(--rm-paper);color:var(--rm-text);border:1px solid var(--rm-border);border-radius:5px;padding:7px 12px;min-height:34px;font:inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+#run-metrics-design .rm-button.rm-primary{background:var(--rm-brand);color:var(--rm-onbrand);border-color:var(--rm-brand)}
+#run-metrics-design .rm-button i{width:16px;height:16px}
+#run-metrics-design .rm-summary{font-size:12px;color:var(--rm-muted);margin:8px 0 12px}
+#run-metrics-design .rm-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+#run-metrics-design .rm-stat{background:var(--rm-paper);border:1px solid var(--rm-border);border-radius:7px;padding:13px;min-height:100px;text-align:left;color:var(--rm-text);font:inherit}
+#run-metrics-design .rm-stat-label{display:block;font-size:12px;color:var(--rm-muted)}
+#run-metrics-design .rm-stat-value{display:block;font-size:24px;font-weight:500;line-height:1.55;font-variant-numeric:tabular-nums}
+#run-metrics-design .rm-stat-unit{font-size:12px;font-weight:400;margin-left:4px;color:var(--rm-muted)}
+#run-metrics-design .rm-panels{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}
+#run-metrics-design .rm-panel{background:var(--rm-paper);border:1px solid var(--rm-border);border-radius:7px;padding:14px;min-width:0}
+#run-metrics-design .rm-panel-head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
+#run-metrics-design .rm-panel-title{font-weight:500;font-size:14px;margin:0}
+#run-metrics-design .rm-panel-head select{max-width:140px}
+#run-metrics-design .rm-heat{display:grid;grid-template-columns:65px repeat(8,minmax(0,1fr));gap:3px}
+#run-metrics-design .rm-station{display:flex;align-items:center;font-size:12px;min-height:32px}
+#run-metrics-design .rm-train-head{font-size:11px;text-align:center;overflow-wrap:anywhere;color:var(--rm-muted);padding-bottom:3px}
+#run-metrics-design .rm-cell{border:0;border-radius:3px;min-height:32px;padding:3px 1px;color:var(--rm-text);font:inherit;font-size:12px;font-variant-numeric:tabular-nums}
+#run-metrics-design .rm-cell[aria-pressed=true]{outline:2px solid var(--rm-blue);outline-offset:-2px}
+#run-metrics-design .rm-legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--rm-muted);margin-top:12px}
+#run-metrics-design .rm-key{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px}
+#run-metrics-design .rm-detail{margin-top:14px;padding:10px 0;border-top:1px solid var(--rm-border);min-height:42px;font-size:12px}
+#run-metrics-design .rm-line{width:100%;display:block;height:240px}
+#run-metrics-design .rm-line text,#run-metrics-design .rm-radar text{fill:var(--rm-text);font:12px "Microsoft YaHei",system-ui,sans-serif}
+#run-metrics-design .rm-gridline{stroke:var(--rm-border);stroke-width:1;fill:none}
+#run-metrics-design .rm-arrival{stroke:var(--rm-blue);fill:none;stroke-width:2}
+#run-metrics-design .rm-departure{stroke:var(--rm-green);fill:none;stroke-width:2;stroke-dasharray:5 4}
+#run-metrics-design .rm-explain{min-height:32px;font-size:12px;color:var(--rm-muted);margin:8px 0}
+#run-metrics-design .rm-drawer{position:absolute;right:10px;top:100px;z-index:5;width:min(330px,calc(100% - 20px));background:var(--rm-paper);border:1px solid var(--rm-border);box-shadow:-10px 12px 34px light-dark(#0002,#0006);border-radius:8px;padding:18px}
+#run-metrics-design .rm-check{display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:13px}
+#run-metrics-design .rm-check input{margin-top:4px;accent-color:var(--rm-brand)}
+#run-metrics-design .rm-group{font-size:12px;font-weight:500;color:var(--rm-muted);margin-top:12px}
+#run-metrics-design .rm-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+#run-metrics-design .rm-error{font-size:12px;color:var(--rm-red);min-height:18px}
+#run-metrics-design .rm-workbench{display:grid;grid-template-columns:210px minmax(0,1fr);gap:14px}
+#run-metrics-design .rm-catalog{background:var(--rm-paper);border:1px solid var(--rm-border);border-radius:7px;padding:14px}
+#run-metrics-design .rm-catalog .rm-check{padding:10px 0}
+#run-metrics-design .rm-results{display:flex;flex-direction:column;gap:14px;min-width:0}
+#run-metrics-design .rm-rank{display:grid;gap:11px}
+#run-metrics-design .rm-rank-row{display:grid;grid-template-columns:66px minmax(0,1fr) 74px;gap:10px;align-items:center;font-size:12px}
+#run-metrics-design .rm-track{background:var(--rm-soft);border-radius:2px;height:12px}
+#run-metrics-design .rm-bar{background:var(--rm-blue);border-radius:2px;height:100%}
+#run-metrics-design .rm-number{text-align:right;font-variant-numeric:tabular-nums}
+#run-metrics-design .rm-table{width:100%;border-collapse:collapse;font-size:12px}
+#run-metrics-design .rm-table th,#run-metrics-design .rm-table td{text-align:left;padding:9px 5px;border-bottom:1px solid var(--rm-border);font-weight:400;overflow-wrap:anywhere}
+#run-metrics-design .rm-table th{color:var(--rm-muted)}
+#run-metrics-design .rm-table .rm-number{text-align:right}
+#run-metrics-design .rm-report{background:var(--rm-paper);border:1px solid var(--rm-border);border-radius:7px;padding:20px}
+#run-metrics-design .rm-report-head{border-bottom:1px solid var(--rm-border);padding-bottom:12px;margin-bottom:16px}
+#run-metrics-design .rm-report-grid{display:grid;grid-template-columns:1fr 1.05fr;gap:22px;align-items:start}
+#run-metrics-design .rm-radar{display:block;width:100%;height:300px}
+#run-metrics-design .rm-radar-data{stroke:var(--rm-blue);fill:color-mix(in srgb,var(--rm-blue) 16%,transparent);stroke-width:2}
+#run-metrics-design .rm-footer{margin-top:16px;color:var(--rm-muted);font-size:12px}
+@media(max-width:760px){
+ #run-metrics-design .rm-app{min-height:1450px}
+ #run-metrics-design .rm-panels,#run-metrics-design .rm-report-grid,#run-metrics-design .rm-workbench{grid-template-columns:1fr}
+ #run-metrics-design .rm-main{padding:14px 12px}
+ #run-metrics-design .rm-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #run-metrics-design .rm-catalog-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}
+ #run-metrics-design .rm-catalog .rm-group{grid-column:1 / -1}
+ #run-metrics-design .rm-report{padding:12px}
+ #run-metrics-design .rm-nav{gap:16px;padding:10px 12px}
+}
+@media(pointer:coarse){
+ #run-metrics-design .rm-button,#run-metrics-design .rm-field select,#run-metrics-design .rm-field input,#run-metrics-design .rm-check,#run-metrics-design .rm-cell{min-height:44px}
+ #run-metrics-design .rm-app select,#run-metrics-design .rm-app input{font-size:16px}
+}
+</style>
+<div class="viz-carousel" aria-label="REDAIMS 单run性能分析界面方案" data-previous-label="上一个方案" data-next-label="下一个方案">
+  <section data-variant="总览与指标侧栏" aria-label="总览与指标侧栏方案">
+    <div class="rm-app">
+      <header class="rm-top"><span class="rm-logo">REDAIMS</span><span>run_01 · 分析工作区</span><span class="rm-demo">演示数据</span></header>
+      <nav class="rm-nav" aria-label="分析模块"><span>运行图</span><span>求解日志</span><span class="rm-active">延误与性能</span></nav>
+      <main class="rm-main">
+        <div class="rm-head"><div><h2 class="rm-title">性能总览</h2><div class="rm-sub">基本图 B001 · 京沪线路 · 已保存的时刻表</div></div><span class="rm-sub">默认视图</span></div>
+        <div class="rm-tools">
+          <label class="rm-field">指标预设<select id="rm-a-preset"><option value="common">常用延误</option><option value="terminal">终到评价</option><option value="distribution">晚点分布</option><option value="custom" disabled>自定义</option></select></label>
+          <label class="rm-field">观测事件<select id="rm-a-event"><option value="arrival">到达</option><option value="departure">出发</option></select></label>
+          <label class="rm-field">晚点阈值／分钟<input id="rm-a-threshold" type="number" min="0" max="30" step="1" value="3"></label>
+          <button type="button" class="rm-button rm-primary cursor-interaction" id="rm-a-open"><i data-lucide="sliders-horizontal" aria-hidden="true"></i>配置指标</button>
+        </div>
+        <div class="rm-summary" id="rm-a-scope"></div>
+        <div class="rm-cards" id="rm-a-cards" aria-label="所选汇总指标"></div>
+        <div class="rm-explain" id="rm-a-explain" aria-live="polite">统计口径：全部列车、全部车站；平均值包含零晚点事件。</div>
+        <div class="rm-panels">
+          <section class="rm-panel"><div class="rm-panel-head"><h3 class="rm-panel-title" id="rm-a-heat-title">到达偏差 · 车站 × 列车</h3><span class="rm-sub">分钟</span></div><div class="rm-heat" id="rm-a-heat"></div><div class="rm-legend"><span><i class="rm-key" style="background:var(--rm-blue)"></i>提前</span><span><i class="rm-key" style="background:var(--rm-red)"></i>晚点</span><span>0 正点</span><span>— 无对应时刻</span></div></section>
+          <section class="rm-panel"><div class="rm-panel-head"><h3 class="rm-panel-title">单车到发偏差曲线</h3><label class="rm-field">列车<select id="rm-a-train"></select></label></div><svg id="rm-a-line" class="rm-line" role="img" aria-label="所选列车的到达和出发偏差曲线"></svg><div class="rm-legend"><span><i class="rm-key" style="background:var(--rm-blue)"></i>到达 · 实线</span><span><i class="rm-key" style="background:var(--rm-green)"></i>出发 · 虚线</span></div></section>
+        </div>
+        <div id="rm-a-cell-detail" class="rm-detail" aria-live="polite">当前列车：G101 · 点击热力表单元格查看对应事件。</div>
+        <div class="rm-footer">图形高亮不改变汇总统计范围。</div>
+      </main>
+      <aside id="rm-a-drawer" class="rm-drawer" aria-label="指标配置" hidden>
+        <div class="rm-panel-head"><span class="rm-panel-title">配置总览指标</span><button id="rm-a-close" class="rm-button cursor-interaction" type="button">关闭</button></div>
+        <div class="rm-sub">已选 <span id="rm-a-count">4</span> 项 · 总览显示 2–6 项</div>
+        <div class="rm-group">晚点规模与分布</div>
+        <label class="rm-check"><input type="checkbox" value="total" checked><span>累计晚点 <span class="rm-sub">· 事件累计</span></span></label>
+        <label class="rm-check"><input type="checkbox" value="mean" checked><span>平均晚点 <span class="rm-sub">· 包含零值</span></span></label>
+        <label class="rm-check"><input type="checkbox" value="max" checked><span>最大晚点</span></label>
+        <label class="rm-check"><input type="checkbox" value="p95"><span>P95 晚点</span></label>
+        <div class="rm-group">影响范围</div>
+        <label class="rm-check"><input type="checkbox" value="late_rate" checked><span>超阈值晚点率</span></label>
+        <label class="rm-check"><input type="checkbox" value="affected"><span>受影响列车数</span></label>
+        <div class="rm-group">终到表现 · 到达事件</div>
+        <label class="rm-check"><input type="checkbox" value="terminal_total"><span>终到累计晚点</span></label>
+        <label class="rm-check"><input type="checkbox" value="terminal_mean"><span>终到平均晚点</span></label>
+        <label class="rm-check"><input type="checkbox" value="terminal_rate"><span>终到晚点列车率</span></label>
+        <div id="rm-a-error" class="rm-error" role="alert"></div>
+        <div class="rm-actions"><button id="rm-a-cancel" class="rm-button cursor-interaction" type="button">取消</button><button id="rm-a-apply" class="rm-button rm-primary cursor-interaction" type="button">应用</button></div>
+      </aside>
+    </div>
+  </section>
+  <section data-variant="指标分析工作台" aria-label="指标分析工作台方案" hidden>
+    <div class="rm-app">
+      <header class="rm-top"><span class="rm-logo">REDAIMS</span><span>run_01 · 分析工作区</span><span class="rm-demo">演示数据</span></header>
+      <nav class="rm-nav"><span>运行图</span><span>求解日志</span><span class="rm-active">延误与性能</span></nav>
+      <main class="rm-main">
+        <div class="rm-head"><div><h2 class="rm-title">指标分析工作台</h2><div class="rm-sub">基本图 B001 · 全部列车与车站 · 到达事件</div></div><span class="rm-sub">研究分析视图</span></div>
+        <div class="rm-workbench">
+          <aside class="rm-catalog" aria-label="指标目录"><div class="rm-panel-title">指标目录</div><div class="rm-catalog-options" id="rm-b-metrics">
+            <div class="rm-group">沿途晚点</div>
+            <label class="rm-check"><input type="radio" name="rm-b-metric" value="total"><span>累计晚点</span></label>
+            <label class="rm-check"><input type="radio" name="rm-b-metric" value="mean"><span>平均晚点</span></label>
+            <label class="rm-check"><input type="radio" name="rm-b-metric" value="max"><span>最大晚点</span></label>
+            <label class="rm-check"><input type="radio" name="rm-b-metric" value="p95"><span>P95 晚点</span></label>
+            <label class="rm-check"><input type="radio" name="rm-b-metric" value="late_rate"><span>超阈值晚点率</span></label>
+            <div class="rm-group">终到表现</div>
+            <label class="rm-check"><input type="radio" name="rm-b-metric" value="terminal" checked><span>终到晚点</span></label>
+          </div><div class="rm-detail">晚点阈值：3 分钟</div></aside>
+          <div class="rm-results">
+            <section class="rm-panel">
+              <div class="rm-head">
+                <label class="rm-field">分析粒度<select id="rm-b-grain"><option value="train">按列车</option><option value="station" id="rm-b-station-option" disabled>按车站</option></select></label>
+                <label class="rm-field">呈现方式<select id="rm-b-chart"><option value="bar">排序条形图</option><option value="table">指标明细表</option></select></label>
+              </div>
+              <div class="rm-panel-head"><h3 id="rm-b-title" class="rm-panel-title">列车终到晚点</h3><span id="rm-b-unit" class="rm-sub">分钟</span></div>
+              <div id="rm-b-output"></div><div id="rm-b-axis" class="rm-summary"></div>
+            </section>
+            <section class="rm-panel"><div class="rm-panel-head"><h3 class="rm-panel-title">最高值对象 · 事件明细</h3><span class="rm-sub" id="rm-b-samples"></span></div><div id="rm-b-detail"></div></section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+  <section data-variant="报告模板与雷达概览" aria-label="报告模板与雷达概览方案" hidden>
+    <div class="rm-app">
+      <header class="rm-top"><span class="rm-logo">REDAIMS</span><span>run_01 · 分析工作区</span><span class="rm-demo">演示数据</span></header>
+      <nav class="rm-nav"><span>运行图</span><span>求解日志</span><span class="rm-active">延误与性能</span></nav>
+      <main class="rm-main">
+        <div class="rm-head"><div><h2 class="rm-title">分析报告预览</h2><div class="rm-sub">固定模板 · 原始指标与图形对应</div></div><span class="rm-sub">汇报与归档视图</span></div>
+        <div class="rm-tools">
+          <label class="rm-field">报告模板<select id="rm-c-template"><option value="all">单run性能简报</option><option value="terminal">终到表现简报</option></select></label>
+          <label class="rm-check"><input id="rm-c-show-profile" type="checkbox" checked><span>多指标概览</span></label>
+          <label class="rm-check"><input id="rm-c-show-details" type="checkbox" checked><span>列车明细</span></label>
+        </div>
+        <article class="rm-report">
+          <header class="rm-report-head"><div class="rm-title" id="rm-c-title">单run性能简报</div><div class="rm-sub">run_01 · 基本图 B001 · 到达事件 · 阈值 3 分钟</div></header>
+          <div class="rm-report-grid">
+            <section><div class="rm-panel-head"><h3 class="rm-panel-title">原始指标</h3><span class="rm-sub">有效到达事件 40 条</span></div><div id="rm-c-metrics"></div></section>
+            <section id="rm-c-profile"><div class="rm-panel-head"><h3 class="rm-panel-title">多指标概览</h3><label class="rm-field">图形<select id="rm-c-profile-type"><option value="radar">雷达图</option><option value="bars">参考刻度条形图</option></select></label></div><div id="rm-c-profile-output"></div><div class="rm-sub">固定参考刻度 · 晚点越小越靠近中心／起点</div><div class="rm-sub">参考上限：平均 10 分，最大 30 分，事件率 100%，终到平均 10 分，终到率 100%。</div></section>
+          </div>
+          <section id="rm-c-detail-section" style="margin-top:20px"><div class="rm-panel-head"><h3 class="rm-panel-title">列车终到明细</h3><span class="rm-sub">每趟列车只计一次</span></div><div id="rm-c-details"></div></section>
+          <div class="rm-footer">雷达参考上限为演示设置；原始值保留于指标表。</div>
+        </article>
+      </main>
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+ const root=document.getElementById('run-metrics-design');
+ const q=s=>root.querySelector(s),qa=s=>[...root.querySelectorAll(s)];
+ const stations=['北京南','德州东','济南西','徐州东','南京南','上海虹桥'];
+ const trains=[
+  {name:'G101',arrival:[null,5,8,7,6,4],departure:[4,6,9,8,6,null]},
+  {name:'G103',arrival:[null,0,2,1,0,0],departure:[0,1,2,1,0,null]},
+  {name:'G105',arrival:[null,7,12,10,8,6],departure:[6,8,13,11,9,null]},
+  {name:'G107',arrival:[null,12,18,16,13,9],departure:[10,13,19,17,14,null]},
+  {name:'G109',arrival:[null,-1,0,2,1,0],departure:[0,0,1,2,1,null]},
+  {name:'G111',arrival:[null,1,3,2,0,-1],departure:[-1,2,3,2,0,null]},
+  {name:'G113',arrival:[null,3,5,4,3,2],departure:[2,4,6,5,3,null]},
+  {name:'G115',arrival:[null,0,1,0,0,0],departure:[0,0,1,0,0,null]}
+ ];
+ const valid=a=>a.filter(v=>typeof v==='number'&&Number.isFinite(v));
+ const sum=a=>a.reduce((s,v)=>s+v,0),late=v=>Math.max(0,v);
+ const fmt=v=>v===null||v===undefined?'—':Number.isInteger(v)?String(v):v.toFixed(1);
+ const signed=v=>v===null?'—':(v>0?'+':'')+fmt(v);
+ const all=field=>valid(trains.flatMap(t=>t[field]));
+ const ends=trains.map(t=>late(t.arrival.at(-1)));
+ function stats(values,threshold=3){
+  const raw=valid(values),a=raw.map(late).sort((x,y)=>x-y);
+  return {count:raw.length,total:sum(a),mean:a.length?sum(a)/a.length:null,max:a.length?a.at(-1):null,p95:a.length?a[Math.ceil(.95*a.length)-1]:null,late_rate:raw.length?100*raw.filter(v=>v>threshold).length/raw.length:null};
+ }
+ function definition(id,field,threshold){
+  const t=field==='arrival'?'到达':'出发';
+  return {
+   total:['累计'+t+'晚点','分钟','有效事件的非负晚点累计'],
+   mean:['平均'+t+'晚点','分钟','所有有效事件平均，包含零晚点'],
+   max:['最大'+t+'晚点','分钟','有效事件中的最大晚点'],
+   p95:['P95 '+t+'晚点','分钟','全部有效事件第95百分位，包含零晚点'],
+   late_rate:[t+'晚点率','%','偏差严格大于 '+threshold+' 分钟的有效事件占比'],
+   affected:['受影响列车数','列','存在超阈值'+t+'事件的列车，每趟计一次'],
+   terminal_total:['终到累计晚点','分钟','每趟列车完整路径终到到达晚点累计'],
+   terminal_mean:['终到平均晚点','分钟','每趟列车完整路径终到到达晚点平均'],
+   terminal_rate:['终到晚点列车率','%','终到到达偏差严格大于 '+threshold+' 分钟的列车占比']
+  }[id];
+ }
+ function metric(id,field,threshold){
+  if(id==='affected')return trains.filter(t=>valid(t[field]).some(v=>v>threshold)).length;
+  if(id==='terminal_total')return sum(ends);
+  if(id==='terminal_mean')return sum(ends)/ends.length;
+  if(id==='terminal_rate')return 100*trains.filter(t=>t.arrival.at(-1)>threshold).length/trains.length;
+  return stats(all(field),threshold)[id];
+ }
+ const state={a:{selected:['total','mean','max','late_rate'],field:'arrival',threshold:3,train:0,cell:null},b:{metric:'terminal',grain:'train',chart:'bar'}};
+ function cards(){
+  const a=state.a;
+  q('#rm-a-scope').textContent='8 列车 · 6 车站 · '+stats(all(a.field)).count+' 个有效'+(a.field==='arrival'?'到达':'出发')+'事件 · 空时刻不计入分母';
+  q('#rm-a-cards').innerHTML=a.selected.map(id=>{
+   const d=definition(id,a.field,a.threshold);
+   return '<button type="button" class="rm-stat cursor-interaction" data-metric="'+id+'" aria-label="'+d[0]+'，点击查看口径"><span class="rm-stat-label">'+d[0]+'</span><span class="rm-stat-value">'+fmt(metric(id,a.field,a.threshold))+'<span class="rm-stat-unit">'+d[1]+'</span></span><span class="rm-sub">'+(id==='late_rate'?'阈值 > '+a.threshold+' 分钟':id.startsWith('terminal')?'每趟列车一次':'查看统计口径')+'</span></button>';
+  }).join('');
+ }
+ function heat(){
+  const a=state.a;
+  q('#rm-a-heat-title').textContent=(a.field==='arrival'?'到达':'出发')+'偏差 · 车站 × 列车';
+  let html='<span class="rm-station">车站</span>'+trains.map(t=>'<span class="rm-train-head">'+t.name+'</span>').join('');
+  stations.forEach((station,row)=>{
+   html+='<span class="rm-station">'+station+'</span>';
+   trains.forEach((t,col)=>{
+    const v=t[a.field][row],mix=v===null||v===0?0:Math.min(32,Math.abs(v)/20*32)+8;
+    const bg=v===null?'var(--rm-soft)':v===0?'var(--rm-paper)':'color-mix(in srgb,var('+(v<0?'--rm-blue':'--rm-red')+') '+mix+'%,var(--rm-paper))';
+    const chosen=a.cell&&a.cell[0]===row&&a.cell[1]===col;
+    const label=t.name+' '+station+' '+(a.field==='arrival'?'到达':'出发')+'偏差 '+signed(v)+(v===null?'':' 分钟');
+    html+='<button type="button" class="rm-cell cursor-interaction" data-cell="'+row+','+col+'" aria-pressed="'+Boolean(chosen)+'" aria-label="'+label+'" data-tooltip="'+label+'" style="background:'+bg+'">'+signed(v)+'</button>';
+   });
+  });
+  q('#rm-a-heat').innerHTML=html;
+ }
+ function line(){
+  const node=q('#rm-a-line'),w=Math.max(230,node.getBoundingClientRect().width||400),h=240;
+  const t=trains[state.a.train],vals=[...valid(t.arrival),...valid(t.departure),0];
+  const lo=Math.min(...vals)-1,hi=Math.max(...vals)+2,left=40,right=w-14,top=27,bottom=193;
+  const x=i=>left+i/5*(right-left),y=v=>bottom-(v-lo)/(hi-lo)*(bottom-top);
+  let html='<title>'+t.name+' 到发偏差（分钟）</title><text x="0" y="13">分钟</text>';
+  for(let i=0;i<4;i++){
+   const v=lo+i*(hi-lo)/3,py=y(v);
+   html+='<line class="rm-gridline" x1="'+left+'" x2="'+right+'" y1="'+py+'" y2="'+py+'"/><text x="'+(left-7)+'" y="'+(py+4)+'" text-anchor="end">'+fmt(v)+'</text>';
+  }
+  html+='<line class="rm-gridline" x1="'+left+'" x2="'+right+'" y1="'+y(0)+'" y2="'+y(0)+'"/>';
+  ['arrival','departure'].forEach(field=>{
+   let path='',prev=false;
+   t[field].forEach((v,i)=>{if(v===null){prev=false;return;}path+=(prev?' L':'M')+x(i)+' '+y(v);prev=true;});
+   html+='<path class="rm-'+field+'" d="'+path+'"/>';
+   t[field].forEach((v,i)=>{if(v!==null)html+='<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3" style="fill:var('+(field==='arrival'?'--rm-blue':'--rm-green')+')" data-tooltip="'+t.name+' '+stations[i]+' '+(field==='arrival'?'到达':'出发')+signed(v)+' 分钟"/>';});
+  });
+  stations.forEach((s,i)=>{if(w<320&&i%2&&i!==5)return;html+='<text x="'+x(i)+'" y="215" text-anchor="'+(i===0?'start':i===5?'end':'middle')+'">'+(s==='上海虹桥'?'虹桥':s)+'</text>';});
+  html+='<text x="'+right+'" y="238" text-anchor="end">车站（运行顺序）</text>';
+  node.setAttribute('viewBox','0 0 '+w+' '+h);node.innerHTML=html;
+ }
+ function renderA(){cards();heat();line();}
+ function openDrawer(){
+  qa('#rm-a-drawer input[type="checkbox"]').forEach(i=>{i.checked=state.a.selected.includes(i.value);});
+  q('#rm-a-error').textContent='';q('#rm-a-count').textContent=state.a.selected.length;
+  q('#rm-a-drawer').hidden=false;q('#rm-a-close').focus();
+ }
+ function closeDrawer(){q('#rm-a-drawer').hidden=true;q('#rm-a-open').focus();}
+ q('#rm-a-open').addEventListener('click',openDrawer);
+ q('#rm-a-close').addEventListener('click',closeDrawer);
+ q('#rm-a-cancel').addEventListener('click',closeDrawer);
+ q('#rm-a-drawer').addEventListener('change',()=>{q('#rm-a-count').textContent=qa('#rm-a-drawer input:checked').length;q('#rm-a-error').textContent='';});
+ q('#rm-a-apply').addEventListener('click',()=>{
+  const selected=qa('#rm-a-drawer input:checked').map(i=>i.value);
+  if(selected.length<2||selected.length>6){q('#rm-a-error').textContent='请选择 2–6 项总览指标。';return;}
+  state.a.selected=selected;q('#rm-a-preset').value='custom';cards();closeDrawer();
+ });
+ q('#rm-a-preset').addEventListener('change',e=>{
+  const p={common:['total','mean','max','late_rate'],terminal:['terminal_total','terminal_mean','terminal_rate','affected'],distribution:['mean','p95','max','late_rate']};
+  if(p[e.target.value]){state.a.selected=p[e.target.value];cards();}
+ });
+ q('#rm-a-event').addEventListener('change',e=>{state.a.field=e.target.value;state.a.cell=null;q('#rm-a-cell-detail').textContent='当前列车：'+trains[state.a.train].name;renderA();});
+ q('#rm-a-threshold').addEventListener('input',e=>{
+  if(!e.target.value.trim())return;const v=Number(e.target.value);
+  if(Number.isFinite(v)&&v>=0&&v<=30){state.a.threshold=v;cards();}
+ });
+ q('#rm-a-cards').addEventListener('click',e=>{
+  const item=e.target.closest('[data-metric]');if(!item)return;
+  const d=definition(item.dataset.metric,state.a.field,state.a.threshold);q('#rm-a-explain').textContent=d[0]+'：'+d[2]+'。';
+ });
+ q('#rm-a-train').innerHTML=trains.map((t,i)=>'<option value="'+i+'">'+t.name+'</option>').join('');
+ q('#rm-a-train').addEventListener('change',e=>{state.a.train=Number(e.target.value);line();});
+ q('#rm-a-heat').addEventListener('click',e=>{
+  const item=e.target.closest('[data-cell]');if(!item)return;
+  const [row,col]=item.dataset.cell.split(',').map(Number),v=trains[col][state.a.field][row];
+  state.a.cell=[row,col];state.a.train=col;q('#rm-a-train').value=col;
+  q('#rm-a-cell-detail').textContent=trains[col].name+' · '+stations[row]+' · '+(state.a.field==='arrival'?'到达':'出发')+'偏差 '+signed(v)+(v===null?'（无对应时刻）':' 分钟')+' · 汇总范围保持全部列车';
+  heat();line();
+ });
+ root.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('#rm-a-drawer').hidden)closeDrawer();});
+ function metricRows(){
+  const b=state.b,src=b.grain==='train'?trains.map(t=>({name:t.name,values:t.arrival,terminal:late(t.arrival.at(-1))})):stations.map((name,i)=>({name,values:trains.map(t=>t.arrival[i])}));
+  return src.map(r=>({name:r.name,value:b.metric==='terminal'?r.terminal:stats(r.values)[b.metric],count:valid(r.values).length})).sort((a,b)=>(b.value??-Infinity)-(a.value??-Infinity));
+ }
+ function renderB(){
+  const b=state.b,isEnd=b.metric==='terminal';q('#rm-b-station-option').disabled=isEnd;
+  if(isEnd){b.grain='train';q('#rm-b-grain').value='train';}
+  const rows=metricRows(),unit=b.metric==='late_rate'?'%':'分钟',name=isEnd?'终到晚点':definition(b.metric,'arrival',3)[0];
+  q('#rm-b-title').textContent=(b.grain==='train'?'列车':'车站')+' · '+name;q('#rm-b-unit').textContent=unit;
+  if(b.chart==='bar'){
+   const max=Math.max(1,...rows.map(r=>r.value??0));
+   q('#rm-b-output').innerHTML='<div class="rm-rank">'+rows.map(r=>'<div class="rm-rank-row"><span>'+r.name+'</span><div class="rm-track"><div class="rm-bar" style="width:'+(r.value===null?0:r.value/max*100)+'%"></div></div><span class="rm-number">'+fmt(r.value)+(r.value===null?'':' '+unit)+'</span></div>').join('')+'</div>';
+   q('#rm-b-axis').textContent='横轴：'+name+'（'+unit+'），从 0 起；数值由大到小排序。';
+  }else{
+   q('#rm-b-output').innerHTML='<table class="rm-table"><thead><tr><th>'+(b.grain==='train'?'列车':'车站')+'</th><th class="rm-number">'+name+'／'+unit+'</th><th class="rm-number">有效事件</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+r.name+'</td><td class="rm-number">'+fmt(r.value)+'</td><td class="rm-number">'+(isEnd?1:r.count)+'</td></tr>').join('')+'</tbody></table>';
+   q('#rm-b-axis').textContent='缺失值显示“—”，不作为零晚点参与统计。';
+  }
+  const chosen=rows.find(r=>r.value!==null);
+  q('#rm-b-samples').textContent=chosen?chosen.name:'无有效事件';
+  let details=[];
+  if(chosen&&b.grain==='train'){
+   const t=trains.find(t=>t.name===chosen.name);
+   details=stations.map((s,i)=>({name:s,value:t.arrival[i]}));
+  }else if(chosen){
+   const i=stations.indexOf(chosen.name);details=trains.map(t=>({name:t.name,value:t.arrival[i]}));
+  }
+  if(isEnd)details=details.slice(-1);
+  q('#rm-b-detail').innerHTML='<table class="rm-table"><thead><tr><th>'+(b.grain==='train'?'车站':'列车')+'</th><th class="rm-number">到达偏差／分钟</th></tr></thead><tbody>'+details.map(r=>'<tr><td>'+r.name+'</td><td class="rm-number">'+signed(r.value)+'</td></tr>').join('')+'</tbody></table>';
+ }
+ q('#rm-b-metrics').addEventListener('change',e=>{state.b.metric=e.target.value;renderB();});
+ q('#rm-b-grain').addEventListener('change',e=>{state.b.grain=e.target.value;renderB();});
+ q('#rm-b-chart').addEventListener('change',e=>{state.b.chart=e.target.value;renderB();});
+ const profile=[
+  {name:'平均晚点',value:stats(all('arrival')).mean,cap:10,unit:'分钟'},
+  {name:'最大晚点',value:stats(all('arrival')).max,cap:30,unit:'分钟'},
+  {name:'超阈值事件率',value:stats(all('arrival')).late_rate,cap:100,unit:'%'},
+  {name:'终到平均晚点',value:sum(ends)/ends.length,cap:10,unit:'分钟'},
+  {name:'终到晚点列车率',value:metric('terminal_rate','arrival',3),cap:100,unit:'%'}
+ ];
+ function renderProfile(){
+  const target=q('#rm-c-profile-output');
+  if(q('#rm-c-profile-type').value==='bars'){
+   target.innerHTML='<div class="rm-rank" style="padding:12px 0">'+profile.map(p=>'<div style="margin-bottom:14px"><div class="rm-panel-head"><span class="rm-sub">'+p.name+'</span><span class="rm-sub">'+fmt(p.value)+' / '+p.cap+' '+p.unit+'</span></div><div class="rm-track"><div class="rm-bar" style="width:'+p.value/p.cap*100+'%"></div></div></div>').join('')+'</div>';
+   return;
+  }
+  const w=Math.max(240,target.getBoundingClientRect().width||380),h=300,cx=w/2,cy=142,r=Math.min(86,(w-136)/2);
+  const point=(i,ratio)=>{const angle=-Math.PI/2+i*Math.PI*2/profile.length;return[cx+r*ratio*Math.cos(angle),cy+r*ratio*Math.sin(angle)];};
+  const polygon=ratio=>profile.map((_,i)=>point(i,ratio).join(',')).join(' ');
+  let html='<svg class="rm-radar" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="单run五项晚点指标相对固定参考上限的雷达图"><title>固定参考刻度的晚点概览</title>';
+  [.25,.5,.75,1].forEach(n=>{html+='<polygon class="rm-gridline" points="'+polygon(n)+'"/>';});
+  profile.forEach((p,i)=>{
+   const [x,y]=point(i,1),[tx,ty]=point(i,1.18),labels=p.name.length>5?[p.name.slice(0,2),p.name.slice(2)]:[p.name];
+   const anchor=tx<cx-12?'end':tx>cx+12?'start':'middle';
+   html+='<line class="rm-gridline" x1="'+cx+'" y1="'+cy+'" x2="'+x+'" y2="'+y+'"/><text x="'+tx+'" y="'+(ty-(labels.length>1?4:0))+'" text-anchor="'+anchor+'">'+labels.map((s,j)=>'<tspan x="'+tx+'" dy="'+(j?15:0)+'">'+s+'</tspan>').join('')+'</text>';
+  });
+  html+='<polygon class="rm-radar-data" points="'+profile.map((p,i)=>point(i,p.value/p.cap).join(',')).join(' ')+'"/>';
+  profile.forEach((p,i)=>{const [x,y]=point(i,p.value/p.cap);html+='<circle cx="'+x+'" cy="'+y+'" r="4" style="fill:var(--rm-blue)" data-tooltip="'+p.name+'：'+fmt(p.value)+' '+p.unit+'；参考上限 '+p.cap+' '+p.unit+'"/>';});
+  html+='<text x="'+cx+'" y="278" text-anchor="middle">外圈 = 各指标固定参考上限</text></svg>';
+  target.innerHTML=html;
+ }
+ function renderC(){
+  const end=q('#rm-c-template').value==='terminal';
+  q('#rm-c-title').textContent=end?'终到表现简报':'单run性能简报';
+  const ids=end?['terminal_total','terminal_mean','terminal_rate']:['total','mean','max','p95','late_rate','terminal_total','terminal_mean'];
+  q('#rm-c-metrics').innerHTML='<table class="rm-table"><thead><tr><th>指标</th><th class="rm-number">原始值</th><th>单位</th></tr></thead><tbody>'+ids.map(id=>{
+   const d=definition(id,'arrival',3);return'<tr><td>'+d[0]+'</td><td class="rm-number">'+fmt(metric(id,'arrival',3))+'</td><td>'+d[1]+'</td></tr>';
+  }).join('')+'</tbody></table>';
+  q('#rm-c-show-profile').disabled=end;q('#rm-c-profile').hidden=!q('#rm-c-show-profile').checked||end;
+  q('#rm-c-detail-section').hidden=!q('#rm-c-show-details').checked;
+  q('#rm-c-details').innerHTML='<table class="rm-table"><thead><tr><th>列车</th><th class="rm-number">始发出发偏差／分钟</th><th class="rm-number">终到到达偏差／分钟</th></tr></thead><tbody>'+trains.map(t=>'<tr><td>'+t.name+'</td><td class="rm-number">'+signed(t.departure[0])+'</td><td class="rm-number">'+signed(t.arrival.at(-1))+'</td></tr>').join('')+'</tbody></table>';
+  renderProfile();
+ }
+ q('#rm-c-template').addEventListener('change',renderC);
+ q('#rm-c-show-profile').addEventListener('change',renderC);
+ q('#rm-c-show-details').addEventListener('change',renderC);
+ q('#rm-c-profile-type').addEventListener('change',renderProfile);
+ renderA();renderB();renderC();
+ if(typeof ResizeObserver!=='undefined'){
+  const observer=new ResizeObserver(()=>{line();if(q('#rm-c-profile-type').value==='radar')renderProfile();});
+  observer.observe(q('#rm-a-line'));observer.observe(q('#rm-c-profile-output'));
+ }
+})();
+</script>
+</div>

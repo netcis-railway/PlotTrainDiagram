@@ -3023,6 +3023,163 @@
         }
       }
     },
+    "/api/v1/runs/{run_id}/solver-logs/{log_id}": {
+      "get": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Metadata",
+        "operationId": "metadata_api_v1_runs__run_id__solver_logs__log_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolverLog"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Update Results",
+        "operationId": "update_results_api_v1_runs__run_id__solver_logs__log_id__patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolverResultUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolverLog"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Delete Log",
+        "operationId": "delete_log_api_v1_runs__run_id__solver_logs__log_id__delete",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/runs/{run_id}/solver-logs/{log_id}/text": {
       "get": {
         "tags": [
@@ -3255,6 +3412,67 @@
         }
       }
     },
+    "/api/v1/runs/{run_id}/solver-logs/{log_id}/section-notes": {
+      "patch": {
+        "tags": [
+          "solver-logs"
+        ],
+        "summary": "Update Section Notes",
+        "operationId": "update_section_notes_api_v1_runs__run_id__solver_logs__log_id__section_notes_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionNoteUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolverLog"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/diagram/views": {
       "get": {
         "tags": [
@@ -3425,6 +3643,173 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "diagram-views"
+        ],
+        "summary": "Update View",
+        "operationId": "update_view_api_v1_runs__run_id__diagram_views__view_id__patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "View Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagramViewMetadata"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagramViewSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "diagram-views"
+        ],
+        "summary": "Delete View",
+        "operationId": "delete_view_api_v1_runs__run_id__diagram_views__view_id__delete",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "View Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/diagram-views/{view_id}/section-notes": {
+      "patch": {
+        "tags": [
+          "diagram-views"
+        ],
+        "summary": "Update Section Notes",
+        "operationId": "update_section_notes_api_v1_runs__run_id__diagram_views__view_id__section_notes_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "View Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionNoteUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagramViewSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/analysis/nodes": {
@@ -3553,6 +3938,173 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "run-analysis"
+        ],
+        "summary": "Update Node",
+        "operationId": "update_node_api_v1_runs__run_id__analysis_nodes__node_id__patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisMetadata"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisNodeSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "run-analysis"
+        ],
+        "summary": "Delete Node",
+        "operationId": "delete_node_api_v1_runs__run_id__analysis_nodes__node_id__delete",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/analysis-nodes/{node_id}/section-notes": {
+      "patch": {
+        "tags": [
+          "run-analysis"
+        ],
+        "summary": "Update Section Notes",
+        "operationId": "update_section_notes_api_v1_runs__run_id__analysis_nodes__node_id__section_notes_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SectionNoteUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisNodeSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/analysis/logs": {
@@ -3568,6 +4120,144 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/metadata": {
+      "get": {
+        "tags": [
+          "run-metadata"
+        ],
+        "summary": "Get Metadata",
+        "operationId": "get_metadata_api_v1_runs__run_id__metadata_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "run-metadata"
+        ],
+        "summary": "Update Metadata",
+        "operationId": "update_metadata_api_v1_runs__run_id__metadata_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunMetadataPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/analysis-notes": {
+      "patch": {
+        "tags": [
+          "run-metadata"
+        ],
+        "summary": "Update Notes",
+        "operationId": "update_notes_api_v1_runs__run_id__analysis_notes_patch",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunSectionNoteUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -4029,6 +4719,28 @@
         ],
         "title": "AddMembers"
       },
+      "AnalysisMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AnalysisMetadata"
+      },
       "AnalysisNodeSummary": {
         "properties": {
           "id": {
@@ -4044,7 +4756,8 @@
             "enum": [
               "view",
               "solver-log",
-              "delay"
+              "delay",
+              "metrics"
             ],
             "title": "Node Type"
           },
@@ -4055,6 +4768,33 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          },
+          "section_notes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "object",
+            "title": "Section Notes"
           }
         },
         "type": "object",
@@ -4110,6 +4850,25 @@
                 "type": "null"
               }
             ]
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricSection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active_view": {
+            "type": "string",
+            "enum": [
+              "workspace",
+              "metrics"
+            ],
+            "title": "Active View",
+            "default": "workspace"
           }
         },
         "additionalProperties": false,
@@ -4355,30 +5114,59 @@
       },
       "CreateAnalysisNode": {
         "properties": {
-          "node_type": {
-            "type": "string",
-            "enum": [
-              "view",
-              "solver-log",
-              "delay"
-            ],
-            "title": "Node Type"
-          },
           "name": {
             "type": "string",
             "maxLength": 200,
             "minLength": 1,
             "title": "Name"
           },
+          "notes": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Notes",
+            "default": ""
+          },
+          "node_type": {
+            "type": "string",
+            "enum": [
+              "view",
+              "solver-log",
+              "delay",
+              "metrics"
+            ],
+            "title": "Node Type"
+          },
           "state": {
             "$ref": "#/components/schemas/AnalysisState"
+          },
+          "section_notes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "object",
+            "title": "Section Notes"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "node_type",
           "name",
+          "node_type",
           "state"
         ],
         "title": "CreateAnalysisNode"
@@ -4391,11 +5179,39 @@
             "minLength": 1,
             "title": "Name"
           },
+          "notes": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Notes",
+            "default": ""
+          },
           "state": {
             "$ref": "#/components/schemas/ViewState"
           },
           "snapshot": {
             "$ref": "#/components/schemas/PlotSnapshot"
+          },
+          "section_notes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "object",
+            "title": "Section Notes"
           }
         },
         "additionalProperties": false,
@@ -4640,6 +5456,28 @@
         "type": "object",
         "title": "DiagramDisplay"
       },
+      "DiagramViewMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "DiagramViewMetadata"
+      },
       "DiagramViewSummary": {
         "properties": {
           "id": {
@@ -4673,6 +5511,33 @@
           "highlight_count": {
             "type": "integer",
             "title": "Highlight Count"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          },
+          "section_notes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "object",
+            "title": "Section Notes"
           }
         },
         "type": "object",
@@ -5084,6 +5949,249 @@
         "type": "object",
         "title": "LogDisplay"
       },
+      "MetricCamera": {
+        "properties": {
+          "azimuth": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Azimuth",
+            "default": -40
+          },
+          "elevation": {
+            "type": "number",
+            "maximum": 80.0,
+            "minimum": 10.0,
+            "title": "Elevation",
+            "default": 28
+          },
+          "zoom": {
+            "type": "number",
+            "maximum": 2.5,
+            "minimum": 0.6,
+            "title": "Zoom",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MetricCamera"
+      },
+      "MetricDisplay": {
+        "properties": {
+          "selected": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "total",
+                "mean",
+                "max",
+                "p95",
+                "late_rate",
+                "affected",
+                "terminal_total",
+                "terminal_mean",
+                "terminal_rate",
+                "terminal_affected"
+              ]
+            },
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 2,
+            "title": "Selected"
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "arrival",
+              "departure"
+            ],
+            "title": "Event",
+            "default": "arrival"
+          },
+          "include_zero_arrivals": {
+            "type": "boolean",
+            "title": "Include Zero Arrivals",
+            "default": true
+          },
+          "include_zero_departures": {
+            "type": "boolean",
+            "title": "Include Zero Departures",
+            "default": true
+          },
+          "curve_train_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curve Train Ids"
+          },
+          "curve_station_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curve Station Ids"
+          },
+          "curve_mode": {
+            "type": "string",
+            "enum": [
+              "2d",
+              "3d"
+            ],
+            "title": "Curve Mode",
+            "default": "2d"
+          },
+          "curve_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "arrival",
+                "departure"
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Curve Fields"
+          },
+          "curve_camera": {
+            "$ref": "#/components/schemas/MetricCamera"
+          },
+          "time_heatmap": {
+            "$ref": "#/components/schemas/MetricTimeHeatmap"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "seconds",
+              "minutes"
+            ],
+            "title": "Unit",
+            "default": "minutes"
+          },
+          "threshold_seconds": {
+            "type": "number",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Threshold Seconds",
+            "default": 0
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "selected"
+            ],
+            "title": "Scope",
+            "default": "all"
+          },
+          "station_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Station Ids"
+          },
+          "train_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Train Ids"
+          },
+          "active_train_id": {
+            "type": "string",
+            "title": "Active Train Id",
+            "default": ""
+          },
+          "row_offset": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Row Offset",
+            "default": 0
+          },
+          "train_offset": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Train Offset",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "selected"
+        ],
+        "title": "MetricDisplay"
+      },
+      "MetricSection": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/MetricDisplay"
+          },
+          "snapshot": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Snapshot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "snapshot"
+        ],
+        "title": "MetricSection"
+      },
+      "MetricTimeHeatmap": {
+        "properties": {
+          "interval_minutes": {
+            "type": "integer",
+            "enum": [
+              1,
+              10,
+              60
+            ],
+            "title": "Interval Minutes",
+            "default": 10
+          },
+          "fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "arrival",
+                "departure"
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MetricTimeHeatmap"
+      },
       "Move": {
         "properties": {
           "target_category_id": {
@@ -5308,6 +6416,63 @@
         ],
         "title": "RepairRequest"
       },
+      "RunMetadataPatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RunMetadataPatch"
+      },
+      "RunSectionNoteUpdate": {
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "diagram",
+              "log",
+              "delay"
+            ],
+            "title": "Section"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "section",
+          "notes"
+        ],
+        "title": "RunSectionNoteUpdate"
+      },
       "SaveRequest": {
         "properties": {
           "revision": {
@@ -5377,7 +6542,8 @@
             "enum": [
               "view",
               "solver-log",
-              "delay"
+              "delay",
+              "metrics"
             ],
             "title": "Node Type"
           },
@@ -5388,6 +6554,33 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          },
+          "section_notes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "object",
+            "title": "Section Notes"
           },
           "state": {
             "$ref": "#/components/schemas/AnalysisState"
@@ -5438,6 +6631,33 @@
             "type": "integer",
             "title": "Highlight Count"
           },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          },
+          "section_notes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "object",
+            "title": "Section Notes"
+          },
           "state": {
             "$ref": "#/components/schemas/ViewState"
           },
@@ -5459,6 +6679,38 @@
           "snapshot"
         ],
         "title": "SavedDiagramView"
+      },
+      "SectionNoteUpdate": {
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "diagram",
+              "log",
+              "delay"
+            ],
+            "title": "Section"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "section",
+          "notes"
+        ],
+        "title": "SectionNoteUpdate"
       },
       "SequenceRepairRequest": {
         "properties": {
@@ -5532,6 +6784,84 @@
             },
             "type": "object",
             "title": "Detection"
+          },
+          "section_notes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "diagram",
+                "log",
+                "delay"
+              ]
+            },
+            "type": "object",
+            "title": "Section Notes"
+          },
+          "best_objective": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Objective"
+          },
+          "solve_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solve Seconds"
+          },
+          "objective_source": {
+            "type": "string",
+            "enum": [
+              "solver-log",
+              "manual",
+              "unavailable"
+            ],
+            "title": "Objective Source",
+            "default": "unavailable"
+          },
+          "time_source": {
+            "type": "string",
+            "enum": [
+              "solver-log",
+              "manual",
+              "unavailable"
+            ],
+            "title": "Time Source",
+            "default": "unavailable"
+          },
+          "result_extraction": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Result Extraction"
+          },
+          "result_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Result Warnings"
           }
         },
         "type": "object",
@@ -5544,6 +6874,36 @@
           "created_at"
         ],
         "title": "SolverLog"
+      },
+      "SolverResultUpdate": {
+        "properties": {
+          "best_objective": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Objective"
+          },
+          "solve_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solve Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SolverResultUpdate"
       },
       "Target": {
         "properties": {

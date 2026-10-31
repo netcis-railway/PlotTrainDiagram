@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import type { DiagramViewSummary } from '../api/diagram'
-import type { AnalysisNodeSummary, AnalysisSection } from '../api/analysis'
+import type { AnalysisNodeSummary, AnalysisSection, RunMetadata } from '../api/analysis'
 import RunAnalysis from './RunAnalysis.vue'
+import RunMetadataEditor from './RunMetadataEditor.vue'
+import SolverLogImport from './SolverLogImport.vue'
 import type { TimetableActionRequest } from '../catalogActions'
 import type { CatalogNode } from '../api/client'
 import { request, post, objectUrl, formatPath, labels, type EditorData, type Change, type EditField, type EditValidation, type MovePreview, type TimetableEvent, type ValidationIssue } from '../api/baseImport'
@@ -15,9 +17,16 @@ import type { RepairIssue } from '../api/trackRepair'
 import { availableLines, stationsOnLine, orderStations, orderTrains, originalOrder, type StationSort, type TrainSort } from '../timetableOrdering'
 import { dockChannel, draftKey, editorHash, forgetTransfer, launchEditor, readTransfer, writeTransfer, type EditorSnapshot } from '../editorWindow'
 const props = defineProps<{ objectType: 'base' | 'run'; objectId: string; nodes: CatalogNode[]; standalone?: boolean; transfer?: string; actionRequest?: TimetableActionRequest }>()
-const emit = defineEmits<{ changed: [owner: string | null]; viewSaved: [view: DiagramViewSummary]; analysisSaved: [node: AnalysisNodeSummary]; logsChanged: []; draftChanged: [dirty: boolean] }>()
+const emit = defineEmits<{ changed: [owner: string | null]; viewSaved: [view: DiagramViewSummary]; analysisSaved: [node: AnalysisNodeSummary]; logsChanged: []; runUpdated: [value: RunMetadata]; draftChanged: [dirty: boolean] }>()
+function applyRunMetadata(value: RunMetadata) {
+  if (!data.value || value.id !== props.objectId) return
+  data.value.object.name = value.name; data.value.object.notes = value.notes; data.value.object.analysis_notes = value.analysis_notes
+  emit('runUpdated', value)
+}
 const analysisSection = ref<AnalysisSection>('diagram')
+const analysisView = ref<'workspace' | 'metrics'>('workspace')
 const editorRoot = ref<HTMLElement | null>(null)
+const editorTable = ref<HTMLElement | null>(null)
 const data = ref<EditorData | null>(null), error = ref(''), status = ref(''), busy = ref(false)
 const draftRevision = ref(''), dateBase = ref(''), checkedBaseDate = ref(false), exportOpen = ref(false), validationPanel = ref<HTMLElement | null>(null)
 const changes = ref<Record<string, Change>>({}), validation = ref<EditValidation | null>(null)
@@ -29,6 +38,7 @@ const stationOrder = ref<StationSort>('original'), trainSort = ref<TrainSort>('o
 const detached = ref(false), docking = ref(false), detachedUrl = ref('')
 let childWindow: Window | null = null, childNonce = '', closeTimer: number | undefined, dockTimer: number | undefined
 const shiftOpen = ref(false), shiftWarnings = ref<ValidationIssue[]>([])
+const logImportOpen = ref(false)
 const plotOpen = ref(false), repairOpen = ref(false), repairWarnings = ref<RepairIssue[]>([])
 const picker = ref(false), movePreview = ref<MovePreview | null>(null), moveTarget = ref(''), moveConfirmed = ref(false)
 const url = computed(() => objectUrl(props.objectType, props.objectId))
@@ -50,6 +60,18 @@ const eventMap = computed(() => new Map((data.value?.events || []).map(e => [`${
 const fields = computed<EditField[]>(() => ['arrival', 'departure', ...(showTracks.value ? ['track_code' as const] : []), ...(showSeq.value ? ['visit_seq' as const] : [])])
 const fieldLabels: Record<EditField, string> = { arrival: '到达', departure: '出发', track_code: '股道', visit_seq: 'SEQ' }
 const canSave = computed(() => !busy.value && !docking.value && validation.value?.can_save && !draftMismatch.value && hasChanges.value && (!validation.value.date_base_change || checkedBaseDate.value) && (!validation.value.issues.some(i => i.severity === 'warning') || checkedWarnings.value) && (!validation.value.train_date_changes.length || checkedDates.value))
+const canTimeShift = computed(()=>!!data.value?.events.length && !busy.value && !docking.value && !draftMismatch.value && !detached.value)
+function openTimeShift() {if(canTimeShift.value)shiftOpen.value=true}
+function openAnalysis(section:AnalysisSection='diagram',view:'workspace'|'metrics'='workspace'){
+  if(!data.value || busy.value || docking.value || draftMismatch.value)return
+  analysisSection.value=section;analysisView.value=view;plotOpen.value=true
+}
+async function editTimetable(){
+  await nextTick()
+  editorTable.value?.scrollIntoView({block:'start',behavior:'smooth'})
+  editorTable.value?.focus({preventScroll:true})
+}
+defineExpose({canTimeShift,openTimeShift})
 function key(id: string, field: EditField) { return `${id}:${field}` }
 function original(event: TimetableEvent, field: EditField) {
   const value = event[field]
@@ -104,9 +126,9 @@ function persist() {
 }
 function restore(saved: EditorSnapshot | null) {
   if (!saved || !data.value) return
-  changes.value = saved.changes || {}; draftRevision.value = saved.revision
+  changes.value = saved.changes || {}; draftRevision.value = data.value.legacy_revision && saved.revision === data.value.legacy_revision ? data.value.revision : saved.revision
   dateBase.value = saved.dateBase ?? data.value.object.date_base ?? ''
-  draftMismatch.value = hasChanges.value && saved.revision !== data.value.revision
+  draftMismatch.value = hasChanges.value && draftRevision.value !== data.value.revision
   if (saved.view) {
     selectedLine.value = lineOptions.value.some(line => String(line.line_ind) === saved.view!.selectedLine) ? saved.view.selectedLine! : ''
     stations.value = saved.view.stations.filter(id => lineStations.value.some(n => n.id === id))
@@ -191,8 +213,13 @@ watch([() => props.actionRequest, data, busy, detached], async () => {
   if (props.actionRequest !== request) return
   editorRoot.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
   editorRoot.value?.focus({ preventScroll: true })
+  if (request.action === 'export') {
+    if (hasChanges.value || draftMismatch.value) { error.value = '请先保存或放弃时刻表修改，再导出基本图和线路数据。'; return }
+    exportOpen.value = true
+  }
   if (request.action === 'diagram' || request.action === 'delay') {
     analysisSection.value = request.action === 'delay' ? 'delay' : 'diagram'
+    analysisView.value = 'workspace'
     if (draftMismatch.value) { error.value = '请先核对并处理旧版本草稿，再查看运行图。'; return }
     plotOpen.value = true
   }
@@ -200,7 +227,7 @@ watch([() => props.actionRequest, data, busy, detached], async () => {
 let loadGeneration = 0
 async function load() {
   const generation = ++loadGeneration
-  repairWarnings.value = []; shiftWarnings.value = []; shiftOpen.value = false; repairOpen.value = false
+  repairWarnings.value = []; shiftWarnings.value = []; shiftOpen.value = false; repairOpen.value = false; logImportOpen.value=false
   busy.value = true; data.value = null; validation.value = null; error.value = ''; movePreview.value = null
   try {
     const result = await request<EditorData>(`${url.value}/tables`)
@@ -302,51 +329,73 @@ watch(() => [props.objectType, props.objectId], load, { immediate: true })
   <p v-if="busy" role="status">正在处理…</p>
   <div v-if="detached" class="category-context" role="status"><p>此时刻表已在独立标签页中编辑。点击该页的“Dock · 嵌回主界面”返回；关闭独立页也会恢复当前编辑器。</p><button @click="resumeEmbedded()">前往独立编辑页</button> <button @click="recoverHere">恢复到当前界面</button> <a :href="detachedUrl" target="_blank">独立编辑页链接</a></div>
   <template v-if="data && !detached">
-    <RunAnalysis v-if="plotOpen && objectType === 'run'" :key="analysisSection" :run-id="objectId" :run-name="data.object.name" :section="analysisSection" :source="{ revision: data.revision, dateBase, originalDateBase: data.object.date_base || '', changes: changeList, initialLine: selectedLine }" @close="plotOpen = false; analysisSection = 'diagram'" @saved="emit('analysisSaved', $event)" @logs-changed="emit('logsChanged')" />
+    <div v-if="objectType==='run'" class="catalog-actions run-object-actions" role="group" aria-label="所选条目操作">
+      <strong>操作</strong>
+      <button type="button" :disabled="busy || docking" @click="openMove">编辑所属类别</button>
+      <button type="button" :disabled="busy || docking" @click="logImportOpen=true">导入求解日志</button>
+      <button type="button" :disabled="!canTimeShift" @click="repairOpen=true">修复股道信息</button>
+      <button type="button" :disabled="busy || docking || hasChanges || draftMismatch" @click="exportOpen=true">导出</button>
+    </div>
+    <SolverLogImport v-if="logImportOpen && objectType==='run'" :key="objectId" :run-id="objectId" :run-name="data.object.name" @close="logImportOpen=false" @imported="emit('logsChanged')" />
+    <RunAnalysis v-if="plotOpen && objectType === 'run'" :key="analysisSection+analysisView" :run-id="objectId" :run-name="data.object.name" :section="analysisSection" :start-view="analysisView" :can-shift="canTimeShift" @time-shift="openTimeShift" :source="{ revision: data.revision, dateBase, originalDateBase: data.object.date_base || '', changes: changeList, initialLine: selectedLine }" @close="plotOpen = false; analysisSection = 'diagram';analysisView='workspace'" @saved="emit('analysisSaved', $event)" @view-updated="emit('viewSaved', $event)" @run-updated="applyRunMetadata" @logs-changed="emit('logsChanged')" />
+    <div v-if="objectType==='run'" class="editor-window-actions run-editor-toolbar" role="group" aria-label="run时刻表操作">
+      <button type="button" :disabled="busy || docking" @click="editTimetable">编辑时刻表</button>
+      <button type="button" :disabled="busy || docking || draftMismatch" @click="openAnalysis('diagram')">查看运行图</button>
+      <button type="button" :disabled="busy || docking || draftMismatch" @click="openAnalysis('delay')">延误预览</button>
+      <button type="button" :disabled="busy || docking || draftMismatch" @click="openAnalysis('delay','metrics')">指标分析</button>
+      <button type="button" :disabled="!canTimeShift" @click="openTimeShift">整车时间平移</button>
+      <button v-if="!standalone" type="button" :disabled="busy || docking" @click="popout">在新标签中编辑</button>
+      <button v-else type="button" :disabled="busy || docking" @click="dock">{{ docking ? '正在嵌回…' : 'Dock · 嵌回主界面' }}</button>
+    </div>
     <div class="editor-heading"><div><h3>{{ objectType === 'base' ? '基本图' : 'run' }}时刻表：{{ data.object.name }}</h3><p>{{ data.object.baseTT_no || `run_${data.object.run_no}` }} · 基准日 {{ data.object.date_base || '尚无正式时刻数据' }}</p>
       <p><strong>直属类别：</strong>{{ data.object.classification_path.length ? `${labels[data.object.classification_path.at(-1)!.kind]} ${data.object.classification_path.at(-1)!.name}` : '未分组' }}</p><p class="muted">{{ formatPath(data.object.classification_path) }}</p></div>
-      <div class="editor-window-actions"><button :disabled="busy || docking || draftMismatch" @click="analysisSection = 'diagram'; plotOpen = true">查看运行图</button><button :disabled="busy || docking" @click="openMove">编辑所属类别</button>
+      <div v-if="objectType==='base'" class="editor-window-actions"><button :disabled="busy || docking || draftMismatch" @click="analysisSection = 'diagram'; plotOpen = true">查看运行图</button><button :disabled="busy || docking" @click="openMove">编辑所属类别</button>
       <button v-if="standalone" :disabled="busy || docking" @click="dock">{{ docking ? '正在嵌回…' : 'Dock · 嵌回主界面' }}</button>
       <button v-else :disabled="busy" @click="popout">在新标签页中编辑</button>
-      <button :disabled="busy || docking || draftMismatch || !data.events.length" @click="shiftOpen = true">整车时间平移</button>
+      <button :disabled="!canTimeShift" @click="openTimeShift">整车时间平移</button>
       <button :disabled="busy || docking || draftMismatch || !data.events.length" @click="repairOpen = true">修复股道信息</button>
       <button :disabled="busy || docking || hasChanges || draftMismatch" @click="exportOpen = true">{{ objectType === 'base' ? '导出基本图和线路数据' : '导出' }}</button></div></div>
-    <div class="editor-date"><label>运行基准日<input v-model="dateBase" type="date" min="2020-01-01" max="9999-12-31" :disabled="busy || docking || !data.object.date_base" /></label>
-      <p class="muted">修改基准日后，保存会更新全部到发日期和列车基准日，保留时分秒与跨日偏移。导出前请先保存修改。</p></div>
-    <TimetableDiagram v-if="plotOpen && objectType === 'base'" :object-type="objectType" :object-id="objectId" :revision="data.revision" :date-base="dateBase" :original-date-base="data.object.date_base || ''" :changes="changeList" :initial-line="selectedLine" @view-saved="emit('viewSaved', $event)" @close="plotOpen = false" />
-    <TimeShift v-if="shiftOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" :trains="data.trains" :initial-selected="trains" @close="shiftOpen = false" @applied="applyTimeShift" />
-    <TrackRepair v-if="repairOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" @close="repairOpen = false" @applied="applyTrackRepair" />
-    <TimetableExport v-if="exportOpen" :url="url" :revision="data.revision" :object-type="objectType" @backup-updated="emit('changed', data.object.owner_category_id)" @close="exportOpen = false" />
-    <CategoryPicker v-if="picker" :nodes="nodes" :current="data.object.owner_category_id" :batch-only="objectType === 'run'" @close="picker = false" @choose="selectTarget" />
-    <div v-if="movePreview" class="category-context"><h3>所属类别修改预览</h3><p>{{ formatPath(movePreview.source_path) }} → {{ formatPath(movePreview.target_path) }}</p>
-      <p v-if="!movePreview.can_move" class="error">目标已占用、位置相同或存在校验问题，不能移动。</p><p v-for="(issue,i) in movePreview.issues" :key="i" class="error">{{ issue.message }}</p>
-      <details><summary>来源发生变化的对象（{{ movePreview.impact.length }}）</summary><ul><li v-for="entry in movePreview.impact" :key="entry.kind + entry.id">{{ entry.name }}：{{ entry.before.name || '无基本图' }} → {{ entry.after.name || '无基本图' }}</li></ul></details>
-      <label class="confirmation"><input v-model="moveConfirmed" type="checkbox" />已核对原、新位置与影响</label><button :disabled="busy || !moveConfirmed || !movePreview.can_move" @click="move">确认修改所属类别</button> <button @click="movePreview = null">取消</button></div>
-    <div v-if="draftMismatch" class="validation-warning">恢复的草稿基于旧版本。请核对单元格的原值与当前输入。<button @click="draftMismatch = false; persist()">已核对，使用当前版本重新校验</button></div>
-    <div class="editor-filters"><div class="editor-line-filter"><label>线路选择<select :value="selectedLine" :disabled="busy || docking" @change="chooseLine(($event.target as HTMLSelectElement).value)"><option value="">所有线路</option><option v-for="line in lineOptions" :key="line.line_ind" :value="String(line.line_ind)">{{ line.line_name_chn || line.line_code || '线路' }}（{{ line.line_ind }}）</option></select></label></div><details><summary>车站选择（{{ stations.length }} / {{ lineStations.length }}）</summary><input v-model="stationSearch" placeholder="搜索车站" /><button @click="stations = lineStations.map(n => n.id)">全选</button> <button @click="stations = []">清空</button><p class="muted">仅列出当前线路范围的车站，可进一步勾选。</p><div class="checkbox-options"><label v-for="n in stationOptions" :key="n.id"><input v-model="stations" type="checkbox" :value="n.id" />{{ n.node_name_chn }} · {{ n.node_name }}</label></div></details>
-      <details><summary>列车选择（{{ trains.length }}）</summary><input v-model="trainSearch" placeholder="搜索车次或基准日" /><button @click="trains = data!.trains.map(t => t.id)">全选</button> <button @click="trains = []">清空</button><div class="checkbox-options"><label v-for="t in trainOptions" :key="t.id"><input v-model="trains" type="checkbox" :value="t.id" />{{ t.train_course_id }} · {{ t.train_base_date }}</label></div></details></div>
-    <div class="editor-toolbar"><span>待保存单元格 {{ changeList.length }} 项（包含被筛选隐藏的修改）{{ dateChanged ? '；另有运行基准日修改' : '' }}</span><div><button :disabled="busy || docking || !hasChanges || draftMismatch" @click="validate">校验</button> <button :disabled="busy || docking || !hasChanges || draftMismatch" @click="save">保存</button></div></div>
-    <details class="train-visibility"><summary>列车显示控制（显示 {{ shownTrains.length }} / 初选 {{ selectedTrains.length }}）</summary>
-      <p class="muted">仅列出“列车选择”中的初选列车。取消勾选只隐藏列车，待保存修改仍保留。</p>
-      <div class="editor-actions"><button :disabled="!selectedTrains.length" @click="hiddenTrains = []">全部显示</button><button :disabled="!selectedTrains.length" @click="hiddenTrains = trains.slice()">全部隐藏</button></div>
-      <div class="table-wrap train-visibility-table"><table v-if="selectedTrains.length" aria-label="初选列车显示控制"><thead><tr><th>显示</th><th>车次号</th><th>日期</th></tr></thead><tbody>
-        <tr v-for="train in selectedTrains" :key="train.id"><td><input type="checkbox" :aria-label="`显示列车 ${train.train_course_id} ${train.train_base_date}`" :checked="!hiddenTrains.includes(train.id)" @change="toggleTrain(train.id, ($event.target as HTMLInputElement).checked)" /></td><td>{{ train.train_course_id }}</td><td>{{ train.train_base_date }}</td></tr>
-      </tbody></table><p v-else>请先在“列车选择”中勾选候选列车。</p></div>
-    </details>
-    <div class="editor-field-controls"><label class="confirmation"><input v-model="showTracks" type="checkbox" />显示股道</label><label class="confirmation"><input v-model="showSeq" type="checkbox" />显示SEQ</label></div>
-    <div class="editor-sort-controls" aria-label="时刻表显示排序">
-      <label title="单条线路按NODE_IND排序；所有线路先按LINE_IND再按NODE_IND排序，共用车站按最小LINE_IND归组且只显示一次。缺少编号的站点排在最后。">车站排序<select v-model="stationOrder" :disabled="busy || docking"><option value="original">原始顺序</option><option value="down">下行排序</option><option value="up">上行排序</option></select></label>
-      <label>列车到达排序<select :value="trainSort === 'arrival' ? sortStation : ''" :disabled="busy || docking || !shownStations.length" @change="chooseTrainSort('arrival', ($event.target as HTMLSelectElement).value)"><option value="">原始列序</option><option v-for="node in shownStations" :key="node.id" :value="node.id">{{ node.node_name_chn }}</option></select></label>
-      <label>列车出发排序<select :value="trainSort === 'departure' ? sortStation : ''" :disabled="busy || docking || !shownStations.length" @change="chooseTrainSort('departure', ($event.target as HTMLSelectElement).value)"><option value="">原始列序</option><option v-for="node in shownStations" :key="node.id" :value="node.id">{{ node.node_name_chn }}</option></select></label>
-      <button :disabled="busy || docking" @click="restoreOrder">恢复原始顺序</button>
-    </div><p class="muted">到达和出发排序以最后一次选择为准。依次采用所选站目标时刻、该站另一时刻、同线路最近可用站时刻（按NODE_SEQ_OF_LINE检索），按时间插入；均无时刻则置后。</p><p class="muted">点击单元格编辑。跨日可输入 25:10:00 或完整日期时刻；“未经过”不能编辑。输入后需重新校验。</p>
-    <fieldset :disabled="busy || docking" class="editor-grid-fieldset"><div class="table-wrap editor-table" tabindex="0" role="region" aria-label="时刻表编辑网格，首列和前三行固定"><table v-if="shownStations.length && shownTrains.length"><thead><tr><th rowspan="3" scope="col" class="station-corner">车站</th><th v-for="t in shownTrains" :key="t.id" :colspan="fields.length">{{ t.train_course_id }}</th></tr><tr><th v-for="t in shownTrains" :key="t.id" :colspan="fields.length">{{ trainDate(t.train_base_date) }}</th></tr><tr><template v-for="t in shownTrains" :key="t.id"><th v-for="f in fields" :key="f">{{ fieldLabels[f] }}</th></template></tr></thead><tbody>
-      <tr v-for="station in shownStations" :key="station.id"><th scope="row">{{ station.node_name_chn }}</th><template v-for="train in shownTrains" :key="train.id"><template v-if="eventMap.get(`${station.id}:${train.id}`)"><td v-for="field in fields" :key="field" :class="{ 'edited-cell': !!changes[key(eventMap.get(`${station.id}:${train.id}`)!.id, field)], 'validation-error': invalid(eventMap.get(`${station.id}:${train.id}`)!.id, field) }"><input :class="{ 'time-field': field === 'arrival' || field === 'departure' }" :id="`cell-${eventMap.get(`${station.id}:${train.id}`)!.id}-${field}`" :aria-invalid="invalid(eventMap.get(`${station.id}:${train.id}`)!.id, field)" :aria-label="`${station.node_name_chn} ${train.train_course_id} ${fieldLabels[field]}`" :title="`原值：${original(eventMap.get(`${station.id}:${train.id}`)!, field) || '空'}`" :value="value(eventMap.get(`${station.id}:${train.id}`)!, field)" @input="record(eventMap.get(`${station.id}:${train.id}`)!, field, ($event.target as HTMLInputElement).value)" @blur="afterCellEdit(field)" /></td></template><td v-else :colspan="fields.length" class="muted">未经过</td></template></tr>
-    </tbody></table><p v-else class="empty-state">{{ selectedLine && !lineStations.length ? '当前对象没有该线路的车站，请选择其他线路。' : '请选择车站和列车；没有正式时刻数据的 run 暂无可编辑单元格。' }}</p></div></fieldset>
-    <div v-if="validation" ref="validationPanel"><p :class="validation.can_save ? 'muted' : 'error'" role="status">{{ validation.can_save ? '无阻断错误，请核对警告后保存。' : '校验未通过，请修正后复检。' }}</p><div class="validation-list"><button v-for="(issue,i) in validation.issues" :key="i" :class="issue.severity === 'error' ? 'validation-error' : 'validation-warning'" @click="locate(issue)">{{ issue.severity === 'error' ? '错误' : '警告' }} · {{ issueLabel(issue) }}：{{ issue.message }}</button></div>
-      <label v-if="validation.date_base_change" class="confirmation"><input v-model="checkedBaseDate" type="checkbox" />确认运行基准日 {{ validation.date_base_change.before }} → {{ validation.date_base_change.after }}，并更新全部到发日期</label>
-      <label v-if="validation.issues.some(i => i.severity === 'warning')" class="confirmation"><input v-model="checkedWarnings" type="checkbox" />已核对并接受警告</label>
-      <template v-if="validation.train_date_changes.length"><p v-for="t in validation.train_date_changes" :key="t.train_course_id">{{ t.train_course_id }} 基准日：{{ t.before }} → {{ t.after }}</p><label class="confirmation"><input v-model="checkedDates" type="checkbox" />确认上述列车基准日变化</label></template>
-    </div><button v-if="hasChanges" :disabled="busy" @click="discard">放弃本次修改</button>
+
+    <RunMetadataEditor v-if="objectType==='run'" :key="objectId" :run-id="objectId" @saved="applyRunMetadata" />
+
+    <section class="run-analysis" aria-label="时刻表查看编辑">
+      <div class="editor-date"><label>运行基准日<input v-model="dateBase" type="date" min="2020-01-01" max="9999-12-31" :disabled="busy || docking || !data.object.date_base" /></label>
+        <p class="muted">修改基准日后，保存会更新全部到发日期和列车基准日，保留时分秒与跨日偏移。导出前请先保存修改。</p></div>
+      <TimetableDiagram v-if="plotOpen && objectType === 'base'" :object-type="objectType" :object-id="objectId" :revision="data.revision" :date-base="dateBase" :original-date-base="data.object.date_base || ''" :changes="changeList" :initial-line="selectedLine" @view-saved="emit('viewSaved', $event)" @close="plotOpen = false" />
+      <TimeShift v-if="shiftOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" :trains="data.trains" :initial-selected="trains" @close="shiftOpen = false" @applied="applyTimeShift" />
+      <TrackRepair v-if="repairOpen" :object-type="objectType" :object-id="objectId" :revision="data.revision" :changes="changeList" :date-base="dateBase" @close="repairOpen = false" @applied="applyTrackRepair" />
+      <TimetableExport v-if="exportOpen" :url="url" :revision="data.revision" :object-type="objectType" @backup-updated="emit('changed', data.object.owner_category_id)" @close="exportOpen = false" />
+      <CategoryPicker v-if="picker" :nodes="nodes" :current="data.object.owner_category_id" :batch-only="objectType === 'run'" @close="picker = false" @choose="selectTarget" />
+      <div v-if="movePreview" class="category-context"><h3>所属类别修改预览</h3><p>{{ formatPath(movePreview.source_path) }} → {{ formatPath(movePreview.target_path) }}</p>
+        <p v-if="!movePreview.can_move" class="error">目标已占用、位置相同或存在校验问题，不能移动。</p><p v-for="(issue,i) in movePreview.issues" :key="i" class="error">{{ issue.message }}</p>
+        <details><summary>来源发生变化的对象（{{ movePreview.impact.length }}）</summary><ul><li v-for="entry in movePreview.impact" :key="entry.kind + entry.id">{{ entry.name }}：{{ entry.before.name || '无基本图' }} → {{ entry.after.name || '无基本图' }}</li></ul></details>
+        <label class="confirmation"><input v-model="moveConfirmed" type="checkbox" />已核对原、新位置与影响</label><button :disabled="busy || !moveConfirmed || !movePreview.can_move" @click="move">确认修改所属类别</button> <button @click="movePreview = null">取消</button></div>
+      <div v-if="draftMismatch" class="validation-warning">恢复的草稿基于旧版本。请核对单元格的原值与当前输入。<button @click="draftMismatch = false; persist()">已核对，使用当前版本重新校验</button></div>
+      <div class="editor-filters"><div class="editor-line-filter"><label>线路选择<select :value="selectedLine" :disabled="busy || docking" @change="chooseLine(($event.target as HTMLSelectElement).value)"><option value="">所有线路</option><option v-for="line in lineOptions" :key="line.line_ind" :value="String(line.line_ind)">{{ line.line_name_chn || line.line_code || '线路' }}（{{ line.line_ind }}）</option></select></label></div><details><summary>车站选择（{{ stations.length }} / {{ lineStations.length }}）</summary><input v-model="stationSearch" placeholder="搜索车站" /><button @click="stations = lineStations.map(n => n.id)">全选</button> <button @click="stations = []">清空</button><p class="muted">仅列出当前线路范围的车站，可进一步勾选。</p><div class="checkbox-options"><label v-for="n in stationOptions" :key="n.id"><input v-model="stations" type="checkbox" :value="n.id" />{{ n.node_name_chn }} · {{ n.node_name }}</label></div></details>
+        <details><summary>列车选择（{{ trains.length }}）</summary><input v-model="trainSearch" placeholder="搜索车次或基准日" /><button @click="trains = data!.trains.map(t => t.id)">全选</button> <button @click="trains = []">清空</button><div class="checkbox-options"><label v-for="t in trainOptions" :key="t.id"><input v-model="trains" type="checkbox" :value="t.id" />{{ t.train_course_id }} · {{ t.train_base_date }}</label></div></details></div>
+      <div class="editor-toolbar"><span>待保存单元格 {{ changeList.length }} 项（包含被筛选隐藏的修改）{{ dateChanged ? '；另有运行基准日修改' : '' }}</span><div><button :disabled="busy || docking || !hasChanges || draftMismatch" @click="validate">校验</button> <button :disabled="busy || docking || !hasChanges || draftMismatch" @click="save">保存</button></div></div>
+      <details class="train-visibility"><summary>列车显示控制（显示 {{ shownTrains.length }} / 初选 {{ selectedTrains.length }}）</summary>
+        <p class="muted">仅列出“列车选择”中的初选列车。取消勾选只隐藏列车，待保存修改仍保留。</p>
+        <div class="editor-actions"><button :disabled="!selectedTrains.length" @click="hiddenTrains = []">全部显示</button><button :disabled="!selectedTrains.length" @click="hiddenTrains = trains.slice()">全部隐藏</button></div>
+        <div class="table-wrap train-visibility-table"><table v-if="selectedTrains.length" aria-label="初选列车显示控制"><thead><tr><th>显示</th><th>车次号</th><th>日期</th></tr></thead><tbody>
+          <tr v-for="train in selectedTrains" :key="train.id"><td><input type="checkbox" :aria-label="`显示列车 ${train.train_course_id} ${train.train_base_date}`" :checked="!hiddenTrains.includes(train.id)" @change="toggleTrain(train.id, ($event.target as HTMLInputElement).checked)" /></td><td>{{ train.train_course_id }}</td><td>{{ train.train_base_date }}</td></tr>
+        </tbody></table><p v-else>请先在“列车选择”中勾选候选列车。</p></div>
+      </details>
+      <div class="editor-field-controls"><label class="confirmation"><input v-model="showTracks" type="checkbox" />显示股道</label><label class="confirmation"><input v-model="showSeq" type="checkbox" />显示SEQ</label></div>
+      <div class="editor-sort-controls" aria-label="时刻表显示排序">
+        <label title="单条线路按NODE_IND排序；所有线路先按LINE_IND再按NODE_IND排序，共用车站按最小LINE_IND归组且只显示一次。缺少编号的站点排在最后。">车站排序<select v-model="stationOrder" :disabled="busy || docking"><option value="original">原始顺序</option><option value="down">下行排序</option><option value="up">上行排序</option></select></label>
+        <label>列车到达排序<select :value="trainSort === 'arrival' ? sortStation : ''" :disabled="busy || docking || !shownStations.length" @change="chooseTrainSort('arrival', ($event.target as HTMLSelectElement).value)"><option value="">原始列序</option><option v-for="node in shownStations" :key="node.id" :value="node.id">{{ node.node_name_chn }}</option></select></label>
+        <label>列车出发排序<select :value="trainSort === 'departure' ? sortStation : ''" :disabled="busy || docking || !shownStations.length" @change="chooseTrainSort('departure', ($event.target as HTMLSelectElement).value)"><option value="">原始列序</option><option v-for="node in shownStations" :key="node.id" :value="node.id">{{ node.node_name_chn }}</option></select></label>
+        <button :disabled="busy || docking" @click="restoreOrder">恢复原始顺序</button>
+      </div><p class="muted">到达和出发排序以最后一次选择为准。依次采用所选站目标时刻、该站另一时刻、同线路最近可用站时刻（按NODE_SEQ_OF_LINE检索），按时间插入；均无时刻则置后。</p><p class="muted">点击单元格编辑。跨日可输入 25:10:00 或完整日期时刻；“未经过”不能编辑。输入后需重新校验。</p>
+      <fieldset :disabled="busy || docking" class="editor-grid-fieldset"><div ref="editorTable" class="table-wrap editor-table" tabindex="0" role="region" aria-label="时刻表编辑网格，首列和前三行固定"><table v-if="shownStations.length && shownTrains.length"><thead><tr><th rowspan="3" scope="col" class="station-corner">车站</th><th v-for="t in shownTrains" :key="t.id" :colspan="fields.length">{{ t.train_course_id }}</th></tr><tr><th v-for="t in shownTrains" :key="t.id" :colspan="fields.length">{{ trainDate(t.train_base_date) }}</th></tr><tr><template v-for="t in shownTrains" :key="t.id"><th v-for="f in fields" :key="f">{{ fieldLabels[f] }}</th></template></tr></thead><tbody>
+        <tr v-for="station in shownStations" :key="station.id"><th scope="row">{{ station.node_name_chn }}</th><template v-for="train in shownTrains" :key="train.id"><template v-if="eventMap.get(`${station.id}:${train.id}`)"><td v-for="field in fields" :key="field" :class="{ 'edited-cell': !!changes[key(eventMap.get(`${station.id}:${train.id}`)!.id, field)], 'validation-error': invalid(eventMap.get(`${station.id}:${train.id}`)!.id, field) }"><input :class="{ 'time-field': field === 'arrival' || field === 'departure' }" :id="`cell-${eventMap.get(`${station.id}:${train.id}`)!.id}-${field}`" :aria-invalid="invalid(eventMap.get(`${station.id}:${train.id}`)!.id, field)" :aria-label="`${station.node_name_chn} ${train.train_course_id} ${fieldLabels[field]}`" :title="`原值：${original(eventMap.get(`${station.id}:${train.id}`)!, field) || '空'}`" :value="value(eventMap.get(`${station.id}:${train.id}`)!, field)" @input="record(eventMap.get(`${station.id}:${train.id}`)!, field, ($event.target as HTMLInputElement).value)" @blur="afterCellEdit(field)" /></td></template><td v-else :colspan="fields.length" class="muted">未经过</td></template></tr>
+      </tbody></table><p v-else class="empty-state">{{ selectedLine && !lineStations.length ? '当前对象没有该线路的车站，请选择其他线路。' : '请选择车站和列车；没有正式时刻数据的 run 暂无可编辑单元格。' }}</p></div></fieldset>
+      <div v-if="validation" ref="validationPanel"><p :class="validation.can_save ? 'muted' : 'error'" role="status">{{ validation.can_save ? '无阻断错误，请核对警告后保存。' : '校验未通过，请修正后复检。' }}</p><div class="validation-list"><button v-for="(issue,i) in validation.issues" :key="i" :class="issue.severity === 'error' ? 'validation-error' : 'validation-warning'" @click="locate(issue)">{{ issue.severity === 'error' ? '错误' : '警告' }} · {{ issueLabel(issue) }}：{{ issue.message }}</button></div>
+        <label v-if="validation.date_base_change" class="confirmation"><input v-model="checkedBaseDate" type="checkbox" />确认运行基准日 {{ validation.date_base_change.before }} → {{ validation.date_base_change.after }}，并更新全部到发日期</label>
+        <label v-if="validation.issues.some(i => i.severity === 'warning')" class="confirmation"><input v-model="checkedWarnings" type="checkbox" />已核对并接受警告</label>
+        <template v-if="validation.train_date_changes.length"><p v-for="t in validation.train_date_changes" :key="t.train_course_id">{{ t.train_course_id }} 基准日：{{ t.before }} → {{ t.after }}</p><label class="confirmation"><input v-model="checkedDates" type="checkbox" />确认上述列车基准日变化</label></template>
+      </div><button v-if="hasChanges" :disabled="busy" @click="discard">放弃本次修改</button>
+    </section>
   </template>
 </div></template>

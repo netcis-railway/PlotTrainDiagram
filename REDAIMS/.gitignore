@@ -1,3 +1,7 @@
+backend/tests/
+frontend/tests/
+planAI/
+
 .venv/
 .devtools/
 __pycache__/

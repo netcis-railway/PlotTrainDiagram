@@ -4,7 +4,7 @@ export interface PreviewTable { name: string; headers: (string | null)[]; rows: 
 export interface EffectiveBase { mode: 'physical' | 'inherited' | 'missing'; base_tt_id: string | null; name?: string; baseTT_no?: string; owner_category_id: string | null; owner_path?: ClassificationEntry[] }
 export interface Resolution { requested_category_id: string; effective: EffectiveBase; local_base: EffectiveBase | null }
 export interface BaseTimetable { id: string; base_tt_id: string; baseTT_no: string; object_type: 'base'; owner_category_id: string; name: string; date_base: string; revision: number; classification_path: ClassificationEntry[]; summary: Record<string, number>; metadata: { issues: ValidationIssue[] }; source_files: { id: string; filename: string; digest: string; managed_path: string }[]; working_file?: { managed_path: string; digest: string } | null }
-export interface OrdinaryRun { id: string; batch_id: string | null; name: string; run_no: number }
+export interface OrdinaryRun { id: string; batch_id: string | null; name: string; run_no: number; notes?: string }
 export interface Impact { kind: string; id: string; name: string; before: EffectiveBase; after: EffectiveBase }
 export interface MovePreview { preview_token: string; source_path: ClassificationEntry[]; target_path: ClassificationEntry[]; can_move: boolean; occupied_base_id?: string; issues: ValidationIssue[]; impact: Impact[] }
 export interface Train { id: string; train_course_id: string; train_base_date: string; adopted_seq?: number; fallback?: boolean }
@@ -14,7 +14,7 @@ export interface TimetableEvent { id: string; node_id: string; train_id: string;
 export interface EditorNode { id: string; node_name_chn: string; node_name: string; node_ind?: number | null; line_inds?: number[]; line_seqs?: Record<string, number | null> }
 export interface EditorLine { line_ind: number; line_code: string; line_name_chn: string }
 export interface OriginalOrder { nodes: string[]; trains: string[]; source: 'excel' | 'provenance'; notice: string }
-export interface EditorData { object: { id: string; object_type: 'base' | 'run'; name: string; baseTT_no?: string; run_no?: number; owner_category_id: string | null; date_base: string | null; classification_path: ClassificationEntry[] }; revision: string; nodes: EditorNode[]; route_nodes?: EditorNode[]; display_lines?: EditorLine[]; original_order?: OriginalOrder; trains: Train[]; events: TimetableEvent[]; infrastructure: Record<string, unknown[]> }
+export interface EditorData { object: { id: string; object_type: 'base' | 'run'; name: string; notes?: string; analysis_notes?: Partial<Record<'diagram'|'log'|'delay', string>>; baseTT_no?: string; run_no?: number; owner_category_id: string | null; date_base: string | null; classification_path: ClassificationEntry[] }; revision: string; legacy_revision?: string; nodes: EditorNode[]; route_nodes?: EditorNode[]; display_lines?: EditorLine[]; original_order?: OriginalOrder; trains: Train[]; events: TimetableEvent[]; infrastructure: Record<string, unknown[]> }
 export type EditField = 'arrival' | 'departure' | 'track_code' | 'visit_seq'
 export interface Change { event_id: string; field: EditField; value: string | number | null }
 export interface EditValidation { can_save: boolean; validation_token: string; change_count: number; issues: ValidationIssue[]; date_base_change?: { before: string; after: string } | null; train_date_changes: { train_course_id: string; before: string; after: string }[] }

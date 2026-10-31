@@ -5,6 +5,7 @@ import { diagramApi, type PlotContext, type PlotData, type PlotSeries, type Plot
 import { fitViewport, localTime, timeLabel, timeRange, zoomViewport, type Viewport } from '../diagramGeometry'
 import { orderPlotTrains } from '../diagramTrainOrdering'
 import DiagramCanvas from './DiagramCanvas.vue'
+import SavedItemDialog from './SavedItemDialog.vue'
 import DiagramTrainDetails from './DiagramTrainDetails.vue'
 const props = defineProps<{ objectType: 'base' | 'run'; objectId: string; revision: string; dateBase: string; originalDateBase: string; changes: Change[]; initialLine: string; savedView?: SavedDiagramView; embedded?: boolean; managed?: boolean; experimentId?: string }>()
 const emit = defineEmits<{ close: []; viewSaved: [view: DiagramViewSummary]; requestSave: [] }>()
@@ -38,7 +39,7 @@ const openPanels = ref<string[]>([])
 function panel(id: string, event: Event) { openPanels.value = (event.target as HTMLDetailsElement).open ? [...new Set([...openPanels.value, id])] : openPanels.value.filter(key => key !== id) }
 const canvasRef = ref<InstanceType<typeof DiagramCanvas> | null>(null)
 const restoredHeight = ref<number>()
-const saveViewOpen = ref(false), viewName = ref(''), savingView = ref(false), viewStatus = ref('')
+const saveViewOpen = ref(false), viewName = ref(''), viewNotes = ref(''), savingView = ref(false), viewStatus = ref('')
 let viewClosed = false
 const snapshotMode = computed(() => !!props.savedView)
 const trackResource = computed(() => data.value?.track_stations.find(resource => resource.node_id === trackStation.value))
@@ -194,7 +195,8 @@ function restoreSavedView(saved: SavedDiagramView) {
 function openSaveView() {
   const title = context.value?.lines.find(item => String(item.line_ind) === line.value)?.line_name_chn || '运行图'
   viewName.value = `${props.savedView?.name || title} · ${new Date().toLocaleString()}`.slice(0, 200)
-  saveViewOpen.value = true; viewStatus.value = ''
+  viewNotes.value = props.savedView?.notes || ''
+  saveViewOpen.value = true; viewStatus.value = ''; error.value = ''
 }
 function currentView(): CreateDiagramView | null {
   if (props.experimentId || !context.value || !data.value || !ready.value || props.objectType !== 'run') return null
@@ -212,13 +214,14 @@ function currentView(): CreateDiagramView | null {
     snapshot: { context: context.value, data: data.value },
   })) as CreateDiagramView
 }
+function submitView(metadata: { name: string; notes: string }) { viewName.value = metadata.name; viewNotes.value = metadata.notes; void saveCurrentView() }
 async function saveCurrentView() {
   if (viewClosed || savingView.value || busy.value || !viewName.value.trim()) return
   const payload = currentView()
   if (!payload) return
   savingView.value = true; error.value = ''
   try {
-    const saved = await diagramApi.saveView(props.objectId, payload)
+    const saved = await diagramApi.saveView(props.objectId, { ...payload, notes: viewNotes.value, section_notes: props.savedView?.section_notes || {} })
     if (viewClosed) return
     viewStatus.value = `已保存视图：${saved.name}，可在run下点击回看。`
     saveViewOpen.value = false; emit('viewSaved', saved)
@@ -236,11 +239,7 @@ onUnmounted(() => { viewClosed = true; generation++; if (styleTimer) window.clea
 <template><component :is="embedded ? 'section' : 'dialog'" ref="dialog" :class="embedded ? 'diagram-embedded' : 'diagram-dialog'" aria-labelledby="diagram-title" @cancel.prevent="emit('close')">
   <div class="diagram-heading"><h2 id="diagram-title">运行图 · {{ data?.object.name || context?.object.name || (objectType === 'base' ? '基本图' : 'run') }}</h2><div><button v-if="!snapshotMode" :disabled="busy" @click="reload()">刷新图形数据和样式</button> <button v-if="objectType === 'run' && !experimentId" :disabled="busy || savingView || !ready" @click="managed ? emit('requestSave') : openSaveView()">保存当前视图</button> <button v-if="!embedded" @click="emit('close')">{{ snapshotMode ? '关闭视图' : '返回时刻表' }}</button></div></div>
   <p v-if="savedView" class="category-context">保存视图：<strong>{{ savedView.name }}</strong> · {{ new Date(savedView.created_at).toLocaleString() }} · 按保存时的数据快照回看，可继续筛选、缩放及高亮。</p>
-  <form v-if="saveViewOpen" class="diagram-save-view" @submit.prevent="saveCurrentView">
-    <label>视图名称<input v-model="viewName" maxlength="200" required :disabled="savingView" /></label>
-    <p class="muted">保存当前线路、车站、基本图/run列车、范围、高亮及绘图快照。时刻表草稿仍需在编辑器另行保存。</p>
-    <div class="catalog-actions"><button type="submit" :disabled="savingView || busy || !viewName.trim()">{{ savingView ? '正在保存…' : '保存视图' }}</button><button type="button" :disabled="savingView" @click="saveViewOpen = false">取消</button></div>
-  </form>
+  <SavedItemDialog v-if="saveViewOpen" type-label="视图" :initial-name="viewName" :initial-notes="viewNotes" :busy="savingView" :error="error" @submit="submitView" @close="saveViewOpen = false" />
   <p v-if="viewStatus" role="status">{{ viewStatus }}</p>
   <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="busy" role="status">正在读取运行图…</p>
   <template v-if="context"><div class="diagram-context"><span>{{ data?.preview ? `预览未保存草稿（${data.preview_changes}个单元格）` : '已保存的工作数据' }}</span> · 运行基准日 {{ data?.object.date_base || context.object.date_base || '无' }} · {{ experimentId ? '实验存放类别' : (objectType === 'base' ? '基本图' : 'run') + '直属类别' }}：{{ formatPath(context.object.classification_path) }}

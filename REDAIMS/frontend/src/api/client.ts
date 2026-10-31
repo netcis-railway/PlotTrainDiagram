@@ -31,7 +31,7 @@ export interface DeletionPreview {
   runs: { id: string; name: string; run_no: number }[];
   eligible_batches: { id: string; name: string }[];
 }
-export interface UngroupedRun { id: string; name: string; run_no: number; origin_path: { name: string }[] }
+export interface UngroupedRun { id: string; name: string; run_no: number; notes?: string; origin_path: { name: string }[] }
 export const deletionApi = {
   preview: (id: string) => request<DeletionPreview>(`/catalog/${id}/deletion-preview`),
   remove: (id: string, payload: { action: 'delete' | 'ungroup' | 'move'; target_batch_id: string | null; preview_token: string; confirmed: true }) =>

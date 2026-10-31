@@ -88,11 +88,30 @@ class Database:
                 )
             """)
 
+            for table in ("run_analysis_nodes", "run_diagram_views", "run_solver_logs"):
+                if table != "run_solver_logs":
+                    connection.execute(
+                        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS notes VARCHAR DEFAULT ''"
+                    )
+                connection.execute(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                    "section_notes JSON DEFAULT '{}'"
+                )
+            connection.execute("ALTER TABLE runs ADD COLUMN IF NOT EXISTS notes VARCHAR DEFAULT ''")
+            connection.execute(
+                "ALTER TABLE runs ADD COLUMN IF NOT EXISTS analysis_notes JSON DEFAULT '{}'"
+            )
+
             initialize(connection)
             for column in (
                 "solver_type VARCHAR DEFAULT 'unknown'",
                 "default_plotter VARCHAR",
                 "detection JSON DEFAULT '{}'",
+                "best_objective DOUBLE",
+                "solve_seconds DOUBLE",
+                "objective_source VARCHAR DEFAULT 'unavailable'",
+                "time_source VARCHAR DEFAULT 'unavailable'",
+                "result_extraction JSON DEFAULT '{}'",
             ):
                 connection.execute(f"ALTER TABLE run_solver_logs ADD COLUMN IF NOT EXISTS {column}")
 

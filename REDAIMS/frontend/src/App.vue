@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue'
+import { nextTick, onUnmounted, ref } from 'vue'
 import { auth } from './api/auth'
 import LoginView from './views/LoginView.vue'
 import WorkspaceView from './views/WorkspaceView.vue'
+import CatalogEntityIcon from './components/CatalogEntityIcon.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import TimetableWindowView from './views/TimetableWindowView.vue'
 import { dockChannel, editorHash, forgetTransfer, readRoute, receiveDock } from './editorWindow'
+const workspace = ref<InstanceType<typeof WorkspaceView> | null>(null)
+async function createExperiment() { view.value = 'catalog'; await nextTick(); await workspace.value?.createExperiment() }
 const session = ref(auth.restore())
 const route = ref(readRoute())
 function routeChanged() { route.value = readRoute(); if (route.value?.mode === 'workspace') view.value = 'catalog' }
@@ -51,8 +54,9 @@ async function logout() {
       <div class="sidebar-brand"><span class="brand-mark">R</span><span v-if="!collapsed">REDAIMS<small>运行图分析系统</small></span></div>
       <nav aria-label="功能导航">
         <button :class="{ active: view === 'catalog' }" :aria-current="view === 'catalog' ? 'page' : undefined" title="分类管理" @click="view = 'catalog'"><span class="nav-icon" aria-hidden="true">▦</span><span v-if="!collapsed">分类管理</span></button>
-        <button :class="{ active: view === 'import' }" :aria-current="view === 'import' ? 'page' : undefined" title="基本图导入 / 预览" @click="view = 'import'"><span class="nav-icon" aria-hidden="true">▤</span><span v-if="!collapsed">基本图导入 / 预览</span></button>
-        <button :class="{ active: view === 'run-import' }" :aria-current="view === 'run-import' ? 'page' : undefined" title="run 导入 / 预检" @click="view = 'run-import'"><span class="nav-icon" aria-hidden="true">▥</span><span v-if="!collapsed">run 导入 / 预检</span></button>
+        <button :class="{ active: view === 'import' }" :aria-current="view === 'import' ? 'page' : undefined" title="基本图导入 / 预览" @click="view = 'import'"><span class="nav-icon" aria-hidden="true"><CatalogEntityIcon kind="base" /></span><span v-if="!collapsed">基本图导入 / 预览</span></button>
+        <button :class="{ active: view === 'run-import' }" :aria-current="view === 'run-import' ? 'page' : undefined" title="run 导入 / 预检" @click="view = 'run-import'"><span class="nav-icon" aria-hidden="true"><CatalogEntityIcon kind="run" /></span><span v-if="!collapsed">run 导入 / 预检</span></button>
+        <button title="创建实验" @click="createExperiment"><span class="nav-icon" aria-hidden="true"><CatalogEntityIcon kind="experiment" /></span><span v-if="!collapsed">创建实验</span></button>
       </nav>
       <div v-if="!collapsed" class="sidebar-footer">RAILWAY RESEARCH<br />工作区 · V0.1</div>
     </aside>
@@ -61,7 +65,7 @@ async function logout() {
         <div class="header-left"><button class="header-button" :aria-expanded="!collapsed" :aria-label="collapsed ? '展开导航' : '折叠导航'" @click="collapsed = !collapsed">☰</button><span class="breadcrumb">工作区 / {{ view === 'catalog' ? '分类管理' : view === 'import' ? '基本图导入 / 预览' : 'run 导入 / 预检' }}</span></div>
         <div class="header-right"><ThemeToggle /><span class="user-name">{{ session.displayName }}</span><button class="header-button" :disabled="busy" @click="logout">退出登录</button></div>
       </header>
-      <div class="app-content"><p v-if="error" role="alert" class="error">{{ error }}</p><WorkspaceView :view="view" :editor-target="route?.mode === 'workspace' ? route : undefined" @open-import="view = 'import'" @open-run-import="view = 'run-import'" @show-catalog="showImportedRun" /></div>
+      <div class="app-content"><p v-if="error" role="alert" class="error">{{ error }}</p><WorkspaceView ref="workspace" :view="view" :editor-target="route?.mode === 'workspace' ? route : undefined" @open-import="view = 'import'" @open-run-import="view = 'run-import'" @show-catalog="showImportedRun" /></div>
     </div>
   </div>
 </template>

@@ -1,10 +1,11 @@
 import type { CatalogNode } from '../api/client'
 import type { Experiment } from '../api/experiments'
+import type { AnalysisNodeType } from '../api/analysis'
 
 // One independent BaseTT item under its physical owner. Inherited items are never added.
 export interface CatalogTreeNode extends CatalogNode {
   experimentReference?: { experimentId: string; ownerId: string; virtual: boolean; runId?: string }
-  analysisReference?: { runId: string; nodeId: string; nodeType: 'view' | 'solver-log' | 'delay' }
+  analysisReference?: { runId: string; nodeId: string; nodeType: AnalysisNodeType }
   logReference?: { runId: string; logId: string }
   viewReference?: { runId: string; viewId: string }
   baseReference?: { scopeId: string; runId: string; inherited: boolean }

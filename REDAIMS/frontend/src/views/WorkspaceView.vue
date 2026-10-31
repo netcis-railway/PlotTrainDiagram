@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import RunAnalysis from '../components/RunAnalysis.vue'
 import ExperimentManager from '../components/ExperimentManager.vue'
 import { experimentApi, type Experiment } from '../api/experiments'
-import { analysisApi, analysisLabels, type AnalysisNodeSummary, type SavedAnalysisNode, type SolverLogSummary } from '../api/analysis'
+import { analysisApi, analysisLabel, type AnalysisNodeSummary, type SavedAnalysisNode, type SolverLogSummary, type RunMetadata } from '../api/analysis'
 import { diagramApi, type DiagramViewSummary, type SavedDiagramView } from '../api/diagram'
 import CatalogContextMenu from '../components/CatalogContextMenu.vue'
+import DeleteCatalogItem from '../components/DeleteCatalogItem.vue'
 import SolverLogImport from '../components/SolverLogImport.vue'
 import { catalogActions, type CatalogActionId, type TimetableActionRequest } from '../catalogActions'
 import ImportPreview from '../components/ImportPreview.vue'
@@ -34,6 +35,12 @@ const tabs = [
 ] as const
 type Tab = typeof tabs[number]['id']
 const activeTab = ref<Tab>('view')
+const mainPanel = ref<HTMLElement | null>(null)
+async function createExperiment() {
+  selectExperiment('')
+  await nextTick()
+  mainPanel.value?.scrollTo({ top: 0 })
+}
 function restoreWidth() {
   try {
     const width = Number(localStorage.getItem('redaims.catalog-width') || 280)
@@ -68,6 +75,7 @@ function afterExperimentChanged(value: Experiment | null, sourceId: string, reve
   experimentListVersion++
   experiments.value = experiments.value.filter(e => e.id !== (value?.id || sourceId))
   if (value) experiments.value.push(value)
+  if (!value && selectedExperimentId.value === sourceId) { selectedExperimentId.value = ''; experimentSelection.value = '' }
   if (reveal) selectExperiment(value?.id || '')
 }
 function replaceExperiments(items: Experiment[]) {
@@ -97,6 +105,7 @@ let viewGeneration = 0, viewListVersion = 0
 const contextMenu = ref<{ x: number; y: number; nodeId: string } | null>(null)
 const logRunId = ref('')
 const actionRequest = ref<TimetableActionRequest>()
+const runDetails = ref<InstanceType<typeof RunDetails> | null>(null)
 let actionSequence = 0
 const kind = ref<CreationKind>('user')
 const parentId = ref('')
@@ -107,7 +116,7 @@ const draftName = ref('')
 const status = ref('正在连接')
 const error = ref('')
 const busy = ref(false)
-const current = computed(() => nodes.value.find(n => n.id === selected.value) || (ungrouped.value.some(r => r.id === selected.value) ? { id: selected.value, kind: 'run' as const, parent_id: null, name: ungrouped.value.find(r => r.id === selected.value)!.name, notes: '' } : undefined))
+const current = computed(() => nodes.value.find(n => n.id === selected.value) || (ungrouped.value.some(r => r.id === selected.value) ? { id: selected.value, kind: 'run' as const, parent_id: null, name: ungrouped.value.find(r => r.id === selected.value)!.name, notes: ungrouped.value.find(r => r.id === selected.value)?.notes || '' } : undefined))
 const selectedDiagramView = computed(() => savedViews.value.find(view => view.id === selectedViewId.value))
 const selectedBase = computed(() => bases.value.find(base => base.id === selectedBaseId.value))
 const currentBaseId = computed(() => selectedBaseId.value || (resolution.value?.requested_category_id === (current.value?.kind === 'run' ? current.value.parent_id : selected.value) ? resolution.value.effective.base_tt_id || '' : ''))
@@ -118,25 +127,79 @@ const treeNodes = computed<CatalogTreeNode[]>(() => {
     baseReference: { scopeId: base.owner_category_id, runId: base.id, inherited: false },
   }))
   const viewItems: CatalogTreeNode[] = savedViews.value.map(view => ({
-    id: viewReferenceId(view.run_id, view.id), parent_id: view.run_id, name: `视图：${view.name}`, kind: 'run', notes: '',
+    id: viewReferenceId(view.run_id, view.id), parent_id: view.run_id, name: `视图：${view.name}`, kind: 'run', notes: view.notes || '',
     viewReference: { runId: view.run_id, viewId: view.id },
   }))
   const analysisItems: CatalogTreeNode[] = analysisNodes.value.map(node => ({
-    id: analysisReferenceId(node.run_id, node.id), parent_id: node.run_id, name: `${analysisLabels[node.node_type]}：${node.name}`, kind: 'run', notes: '',
+    id: analysisReferenceId(node.run_id, node.id), parent_id: node.run_id, name: `${analysisLabel(node.node_type)}：${node.name}`, kind: 'run', notes: node.notes || '',
     analysisReference: { runId: node.run_id, nodeId: node.id, nodeType: node.node_type },
   }))
   const logItems: CatalogTreeNode[] = solverLogs.value.map(log => ({
     id: logReferenceId(log.run_id, log.id), parent_id: log.run_id, name: `求解日志：${log.filename}`, kind: 'run', notes: '',
     logReference: { runId: log.run_id, logId: log.id },
   }))
-  const ungroupedItems: CatalogTreeNode[] = ungrouped.value.map(run => ({ id: run.id, kind: 'run', parent_id: null, name: `未分组run：${run.name}`, notes: '' }))
+  const ungroupedItems: CatalogTreeNode[] = ungrouped.value.map(run => ({ id: run.id, kind: 'run', parent_id: null, name: `未分组run：${run.name}`, notes: run.notes || '' }))
   return [...items, ...nodes.value, ...ungroupedItems, ...viewItems, ...logItems, ...analysisItems,
     ...experimentTreeNodes(experiments.value, new Set([...nodes.value.filter(n => n.kind === 'run').map(n => n.id), ...ungrouped.value.map(r => r.id)]))]
 })
 const selectedTreeId = computed(() => experimentSelection.value || (selectedBaseId.value ? baseReferenceId(selected.value, selectedBaseId.value) : selectedViewId.value ? viewReferenceId(selected.value, selectedViewId.value) : selectedAnalysisId.value ? analysisReferenceId(selected.value, selectedAnalysisId.value) : selectedLogId.value ? logReferenceId(selected.value, selectedLogId.value) : selected.value))
-const selectedEntry = computed(() => treeNodes.value.find(node => node.id === selectedTreeId.value) || current.value)
+const selectedEntry = computed<CatalogTreeNode | undefined>(() => treeNodes.value.find(node => node.id === selectedTreeId.value) || current.value)
 const actions = computed(() => catalogActions(selectedEntry.value, !!currentBaseId.value).map(action => ({ ...action, disabled: !!action.disabled || busy.value })))
 function closeContextMenu() { contextMenu.value = null }
+type DeleteTarget = { entryId: string; name: string; id: string } & (
+  { kind: 'experiment'; revision: number } | { kind: 'analysis' | 'view' | 'log'; runId: string }
+)
+const deleteTarget = ref<DeleteTarget | null>(null), deleteBusy = ref(false), deleteError = ref('')
+let workspaceClosed = false
+const deleteMessage = computed(() => deleteTarget.value?.kind === 'experiment'
+  ? '删除实验实体、成员关系以及所有run下的实验引用；成员run和时刻表保留。'
+  : deleteTarget.value?.kind === 'log' ? '删除该求解日志文件；所属run及其他保存项目保留。'
+  : '删除该保存项目及其配置和数据快照；所属run、时刻表和日志文件保留。')
+function requestDelete() {
+  if (workspaceClosed || deleteBusy.value || deleteTarget.value) return
+  const entry = selectedEntry.value
+  if (!entry) return
+  const common = { entryId: entry.id, name: entry.name }
+  if (entry.experimentReference) {
+    const value = experiments.value.find(item => item.id === entry.experimentReference!.experimentId)
+    if (!value) return
+    deleteTarget.value = { ...common, kind: 'experiment', id: value.id, revision: value.revision }
+  } else if (entry.analysisReference) {
+    deleteTarget.value = { ...common, kind: 'analysis', id: entry.analysisReference.nodeId, runId: entry.analysisReference.runId }
+  } else if (entry.viewReference) {
+    deleteTarget.value = { ...common, kind: 'view', id: entry.viewReference.viewId, runId: entry.viewReference.runId }
+  } else if (entry.logReference) {
+    deleteTarget.value = { ...common, kind: 'log', id: entry.logReference.logId, runId: entry.logReference.runId }
+  }
+  deleteError.value = ''
+}
+function cancelDelete() { if (!deleteBusy.value) deleteTarget.value = null }
+async function deleteItem() {
+  const target = deleteTarget.value
+  if (workspaceClosed || deleteBusy.value || !target) return
+  deleteBusy.value = true; deleteError.value = ''
+  try {
+    if (target.kind === 'experiment') await experimentApi.delete(target.id, target.revision)
+    else if (target.kind === 'analysis') await analysisApi.deleteNode(target.runId, target.id)
+    else if (target.kind === 'view') await diagramApi.deleteView(target.runId, target.id)
+    else await analysisApi.deleteLog(target.runId, target.id)
+    if (workspaceClosed) return
+    if (target.kind === 'experiment') {
+      const wasSelected = selectedExperimentId.value === target.id
+      afterExperimentChanged(null, target.id, false)
+      if (wasSelected) activeTab.value = 'view'
+    } else {
+      viewListVersion++
+      if (target.kind === 'analysis') analysisNodes.value = analysisNodes.value.filter(item => item.id !== target.id || item.run_id !== target.runId)
+      else if (target.kind === 'view') savedViews.value = savedViews.value.filter(item => item.id !== target.id || item.run_id !== target.runId)
+      else solverLogs.value = solverLogs.value.filter(item => item.id !== target.id || item.run_id !== target.runId)
+      if (selectedTreeId.value === target.entryId) closeAnalysisWindow()
+    }
+    status.value = `已删除${target.name}`
+    deleteTarget.value = null
+  } catch (e) { if (!workspaceClosed) deleteError.value = String(e) }
+  finally { deleteBusy.value = false }
+}
 function openContextMenu(node: CatalogTreeNode, event: MouseEvent | KeyboardEvent) {
   select(node, false)
   const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -147,6 +210,7 @@ function performAction(id: CatalogActionId) {
   const action = actions.value.find(item => item.id === id)
   if (!action || action.disabled || busy.value || !current.value) return
   closeContextMenu()
+  if (id === 'delete-item') { requestDelete(); return }
   if (id === 'open-experiment') { activeTab.value = 'experiments'; return }
   if (id === 'open-analysis' && selectedAnalysis.value) { void openAnalysisNode(selectedAnalysis.value); return }
   if (id === 'open-log' && selectedLog.value) { openedLogId.value = selectedLog.value.id; return }
@@ -158,7 +222,7 @@ function performAction(id: CatalogActionId) {
   const objectId = kind === 'run' ? current.value.id : currentBaseId.value
   if (!objectId) return
   activeTab.value = kind === 'base' && !selectedBaseId.value ? 'base' : 'view'
-  actionRequest.value = { sequence: ++actionSequence, kind, objectId, action: id === 'delay-analysis' ? 'delay' : id === 'delete-base' ? 'delete' : id.endsWith('diagram') ? 'diagram' : 'edit' }
+  actionRequest.value = { sequence: ++actionSequence, kind, objectId, action: id === 'export-base' ? 'export' : id === 'delay-analysis' ? 'delay' : id === 'delete-base' ? 'delete' : id.endsWith('diagram') ? 'diagram' : 'edit' }
 }
 watch(() => props.view, closeContextMenu)
 watch(selectedTreeId, closeContextMenu, { flush: 'sync' })
@@ -228,7 +292,7 @@ async function refresh() {
       api.health(), api.catalog(), baseApi.runs(), baseApi.bases(), deletionApi.ungrouped(), diagramApi.views(), analysisApi.nodes(), analysisApi.logs(), experimentApi.list(),
     ])
     nodes.value = [...catalog, ...ordinaryRuns.filter(r => r.batch_id).map(r => ({
-      id: r.id, parent_id: r.batch_id, name: `${r.name} / run_${r.run_no}`, kind: 'run' as const, notes: '',
+      id: r.id, parent_id: r.batch_id, name: `${r.name} / run_${r.run_no}`, kind: 'run' as const, notes: r.notes || '',
     }))]
     bases.value = baseItems; ungrouped.value = ungroupedRuns
     if (experimentsVersion === experimentListVersion) replaceExperiments(experimentItems)
@@ -248,14 +312,22 @@ async function refreshSavedViews() {
   try { const [result, analyses, logs, experimentItems] = await Promise.all([diagramApi.views(), analysisApi.nodes(), analysisApi.logs(), experimentApi.list()]); if (version === viewListVersion) { savedViews.value = result; analysisNodes.value = analyses; solverLogs.value = logs }; if (experimentsVersion === experimentListVersion) replaceExperiments(experimentItems) }
   catch { /* The explicit workspace refresh reports connection failures. */ }
 }
+function afterRunUpdated(value: RunMetadata) {
+  nodes.value = nodes.value.map(node => node.kind === 'run' && node.id === value.id ? { ...node, name: `${value.name} / run_${value.run_no}`, notes: value.notes } : node)
+  ungrouped.value = ungrouped.value.map(run => run.id === value.id ? { ...run, name: value.name, notes: value.notes } : run)
+  void refreshSavedViews()
+}
 function afterViewSaved(view: DiagramViewSummary) {
   viewListVersion++
-  savedViews.value = [...savedViews.value.filter(item => item.id !== view.id), view]
+  savedViews.value = savedViews.value.some(item => item.id === view.id) ? savedViews.value.map(item => item.id === view.id ? view : item) : [...savedViews.value, view]
+  if (openedView.value?.id === view.id) openedView.value = { ...openedView.value, ...view }
   status.value = `已保存运行图视图：${view.name}`
 }
 function afterAnalysisSaved(node: AnalysisNodeSummary) {
-  viewListVersion++; analysisNodes.value = [...analysisNodes.value.filter(item => item.id !== node.id), node]
-  status.value = `已保存${analysisLabels[node.node_type]}：${node.name}`
+  viewListVersion++
+  analysisNodes.value = analysisNodes.value.some(item => item.id === node.id) ? analysisNodes.value.map(item => item.id === node.id ? node : item) : [...analysisNodes.value, node]
+  if (openedAnalysis.value?.id === node.id) openedAnalysis.value = { ...openedAnalysis.value, ...node }
+  status.value = `已保存${analysisLabel(node.node_type)}：${node.name}`
 }
 async function afterLogImported() { status.value = '已保存求解日志'; await refreshSavedViews() }
 function closeAnalysisWindow() {
@@ -390,25 +462,26 @@ async function openRequestedEditor() {
     selectedBaseId.value = ''; selected.value = target.id; activeTab.value = 'view'
   }
 }
+defineExpose({ createExperiment })
 watch(() => props.editorTarget, openRequestedEditor)
 onMounted(() => { window.addEventListener('focus', refreshSavedViews); if (props.editorTarget) void openRequestedEditor(); else void refresh() })
-onUnmounted(() => { viewGeneration++; viewListVersion++; window.removeEventListener('focus', refreshSavedViews) })
+onUnmounted(() => { workspaceClosed = true; viewGeneration++; viewListVersion++; experimentListVersion++; window.removeEventListener('focus', refreshSavedViews) })
 </script>
 
 <template>
 
   <CatalogContextMenu v-if="contextMenu" :key="contextMenu.nodeId" :actions="actions" :name="selectedEntry?.name || ''" :x="contextMenu.x" :y="contextMenu.y" @action="performAction" @close="closeContextMenu" />
+  <DeleteCatalogItem v-if="deleteTarget" :key="deleteTarget.entryId" :name="deleteTarget.name" :message="deleteMessage" :busy="deleteBusy" :error="deleteError" @confirm="deleteItem" @close="cancelDelete" />
   <SolverLogImport v-if="logRunId" :key="logRunId" :run-id="logRunId" :run-name="nodes.find(node => node.id === logRunId)?.name || logRunId" @close="logRunId = ''" @imported="afterLogImported" />
   <div class="workspace-status"><span>工作区</span><span role="status">{{ status }}</span></div>
   <main class="workspace" :class="{ 'import-workspace': view !== 'catalog' }" :style="{ '--catalog-width': `${sidebarWidth}px` }">
     <aside v-show="view === 'catalog'" id="catalog-navigation" class="category-sidebar">
       <div class="category-sidebar-heading"><h2>项目分类</h2><button @click="refresh" :disabled="busy">刷新</button></div>
-      <button type="button" @click="selectExperiment('')">新建 Experiment 实验</button>
       <p v-if="!nodes.length">尚无分类，请点击“新建”创建研究员。</p>
-      <CategoryTree :nodes="treeNodes" :selected="selectedTreeId" :labels="labels" :path="treePath" context-menu @select="select" @contextmenu="openContextMenu" />
+      <CategoryTree :nodes="treeNodes" :selected="selectedTreeId" :labels="labels" :path="treePath" context-menu @select="select" @contextmenu="openContextMenu"><template #actions><button type="button" class="tree-new-experiment" @click="createExperiment">新建 Experiment 实验</button></template></CategoryTree>
     </aside>
     <CatalogSplitter v-show="view === 'catalog'" v-model="sidebarWidth" />
-    <section>
+    <section ref="mainPanel">
       <p v-if="error" role="alert" class="error">{{ error }}</p><p v-if="viewLoading" role="status">正在读取保存视图…</p>
       <div v-if="view === 'catalog'" class="catalog-editor">
         <div class="catalog-tabs" role="tablist" aria-label="分类管理操作">
@@ -418,17 +491,17 @@ onUnmounted(() => { viewGeneration++; viewListVersion++; window.removeEventListe
         </div>
         <article v-if="activeTab === 'view'" id="catalog-panel-view" role="tabpanel" aria-labelledby="catalog-tab-view" tabindex="0">
           <template v-if="current">
-            <h2>查看编辑：{{ selectedAnalysis ? analysisLabels[selectedAnalysis.node_type] + ' ' + selectedAnalysis.name : selectedLog ? '求解日志 ' + selectedLog.filename : selectedDiagramView ? '视图 ' + selectedDiagramView.name : selectedBase ? '基本图 ' + selectedBase.name : labels[current.kind] + ' ' + current.name }}</h2>
+            <h2>查看编辑：{{ selectedAnalysis ? analysisLabel(selectedAnalysis.node_type) + ' ' + selectedAnalysis.name : selectedLog ? '求解日志 ' + selectedLog.filename : selectedDiagramView ? '视图 ' + selectedDiagramView.name : selectedBase ? '基本图 ' + selectedBase.name : labels[current.kind] + ' ' + current.name }}</h2>
             <p class="category-context"><strong>完整分类路径：</strong>{{ selectedBase || isAnalysisChild ? treePath(selectedTreeId) : currentPath }}</p>
-            <div class="catalog-actions" role="group" aria-label="所选条目操作"><strong>操作</strong><button v-for="action in actions" :key="action.id" type="button" :disabled="busy || action.disabled" :title="action.title" :class="{ danger: action.danger }" @click="performAction(action.id)">{{ action.label }}</button></div>
+            <div v-if="current.kind !== 'run' || selectedBase || isAnalysisChild" class="catalog-actions" role="group" aria-label="所选条目操作"><strong>操作</strong><button v-for="action in actions" :key="action.id" type="button" :disabled="busy || action.disabled" :title="action.title" :class="{ danger: action.danger }" @click="performAction(action.id)">{{ action.label }}</button></div>
             <form v-if="!selectedBase && !isAnalysisChild && current.kind !== 'run'" aria-label="编辑分类" @submit.prevent="saveCategory">
               <label>类别名称<input v-model="draftName" required maxlength="200" :disabled="busy" /></label>
               <label>分类备注<textarea v-model="draftNotes" maxlength="20000" :disabled="busy" /></label><button :disabled="busy || !draftName.trim()">{{ busy ? '正在保存…' : '保存修改' }}</button>
             </form>
             <BaseDiagramInfo v-if="selectedBase" :key="selectedBase.id + editorKey" :base-id="selectedBase.id" :scope-path="currentPath" :resolution="resolution" :nodes="nodes" :action-request="actionRequest" @changed="afterDataChanged" />
             <template v-else-if="current.kind === 'run'">
-              <RunDetails :key="current.id + editorKey" :run-id="current.id" :nodes="nodes" :action-request="actionRequest" @view-saved="afterViewSaved" @analysis-saved="afterAnalysisSaved" @logs-changed="refreshSavedViews" @changed="afterDataChanged" />
-              <RunAnalysis v-if="openedAnalysis || openedView || openedLogId" :key="openedAnalysis?.id || openedView?.id || openedLogId" :run-id="current.id" :run-name="current.name" @close="closeAnalysisWindow" :target="{ node: openedAnalysis || undefined, diagram: openedView || undefined, logId: openedLogId || undefined }" @saved="afterAnalysisSaved" @logs-changed="refreshSavedViews" />
+              <RunDetails ref="runDetails" :key="current.id + editorKey" :run-id="current.id" :nodes="nodes" :action-request="actionRequest" @view-saved="afterViewSaved" @analysis-saved="afterAnalysisSaved" @run-updated="afterRunUpdated" @logs-changed="refreshSavedViews" @changed="afterDataChanged" />
+              <RunAnalysis v-if="openedAnalysis || openedView || openedLogId" :key="openedAnalysis?.id || openedView?.id || openedLogId" :run-id="current.id" :run-name="current.name" :can-shift="!!runDetails?.canTimeShift" @time-shift="runDetails?.openTimeShift()" @close="closeAnalysisWindow" :target="{ node: openedAnalysis || undefined, diagram: openedView || undefined, logId: openedLogId || undefined }" @saved="afterAnalysisSaved" @view-updated="afterViewSaved" @run-updated="afterRunUpdated" @logs-changed="refreshSavedViews" />
             </template>
             <div v-else class="category-context"><p>当前有效基本图：{{ resolution?.effective.name || '无' }} <span v-if="resolution?.effective.base_tt_id">（{{ resolution.effective.mode === 'physical' ? '本级存储' : '回溯上级' }}）</span></p></div>
           </template>
